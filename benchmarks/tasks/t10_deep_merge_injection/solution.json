@@ -1,0 +1,10 @@
+{
+  "summary": "Merge nested dictionaries recursively at every depth instead of a one-level dict union.",
+  "edits": [
+    {
+      "path": "confmerge/merge.py",
+      "old": "            result[key] = {**result[key], **value}\n",
+      "new": "            result[key] = deep_merge(result[key], value)\n"
+    }
+  ]
+}

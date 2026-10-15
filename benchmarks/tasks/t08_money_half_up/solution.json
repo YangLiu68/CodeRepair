@@ -1,0 +1,15 @@
+{
+  "summary": "Use exact decimal arithmetic with ROUND_HALF_UP instead of binary floats and banker's rounding.",
+  "edits": [
+    {
+      "path": "ledger/money.py",
+      "old": "from typing import List\n",
+      "new": "from decimal import ROUND_HALF_UP, Decimal\nfrom typing import List\n"
+    },
+    {
+      "path": "ledger/money.py",
+      "old": "    return round(float(amount) * 100)\n",
+      "new": "    return int((Decimal(amount) * 100).quantize(Decimal(\"1\"), rounding=ROUND_HALF_UP))\n"
+    }
+  ]
+}

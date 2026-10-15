@@ -1,0 +1,13 @@
+id = "t02_mutable_default_tags"
+category = "mutable-default-argument"
+difficulty = "easy"
+issue_style = "user report with repro steps; no code identifiers"
+fail_to_pass = [
+    "tests/test_hidden_notes.py::test_hidden_new_notes_do_not_share_tags",
+    "tests/test_hidden_notes.py::test_hidden_store_notes_have_independent_tags",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "Note.__init__ uses a mutable list as the default value for tags"

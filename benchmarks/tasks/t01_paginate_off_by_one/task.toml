@@ -1,0 +1,14 @@
+id = "t01_paginate_off_by_one"
+category = "off-by-one"
+difficulty = "easy"
+issue_style = "behaviour description; names the public function"
+fail_to_pass = [
+    "tests/test_core.py::test_first_page_starts_at_first_item",
+    "tests/test_hidden_pager.py::test_hidden_last_page_is_partial",
+    "tests/test_hidden_pager.py::test_hidden_per_page_one_walks_every_item",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "page offset computed as page * per_page instead of (page - 1) * per_page"

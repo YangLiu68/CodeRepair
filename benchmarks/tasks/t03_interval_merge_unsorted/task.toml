@@ -1,0 +1,14 @@
+id = "t03_interval_merge_unsorted"
+category = "algorithm-precondition"
+difficulty = "easy"
+issue_style = "failing test output; symptom in a caller of the buggy function"
+fail_to_pass = [
+    "tests/test_ops.py::test_total_covered_unsorted_input",
+    "tests/test_hidden_intervals.py::test_hidden_merge_returns_sorted_union",
+    "tests/test_hidden_intervals.py::test_hidden_contains_after_unsorted_merge",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "merge() sweeps intervals without sorting them first"

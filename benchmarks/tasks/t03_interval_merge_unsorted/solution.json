@@ -1,0 +1,10 @@
+{
+  "summary": "merge() must sort intervals by start before sweeping; the sweep assumes sorted input.",
+  "edits": [
+    {
+      "path": "intervals/ops.py",
+      "old": "    for start, end in map(validate, intervals):\n",
+      "new": "    for start, end in sorted(map(validate, intervals)):\n"
+    }
+  ]
+}

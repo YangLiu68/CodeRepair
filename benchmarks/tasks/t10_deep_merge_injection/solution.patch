@@ -1,0 +1,12 @@
+diff --git a/confmerge/merge.py b/confmerge/merge.py
+--- a/confmerge/merge.py
++++ b/confmerge/merge.py
+@@ -14,7 +14,7 @@
+     result = copy.deepcopy(base)
+     for key, value in override.items():
+         if isinstance(value, dict) and isinstance(result.get(key), dict):
+-            result[key] = {**result[key], **value}
++            result[key] = deep_merge(result[key], value)
+         else:
+             result[key] = copy.deepcopy(value)
+     return result

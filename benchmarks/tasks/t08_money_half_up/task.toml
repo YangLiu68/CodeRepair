@@ -1,0 +1,16 @@
+id = "t08_money_half_up"
+category = "numeric-precision"
+difficulty = "medium"
+issue_style = "short report with failing test id"
+fail_to_pass = [
+    "tests/test_money.py::test_to_cents_rounds_half_up",
+    "tests/test_hidden_ledger.py::test_hidden_half_up_not_bankers_rounding",
+    "tests/test_hidden_ledger.py::test_hidden_no_binary_float_artifacts",
+    "tests/test_hidden_ledger.py::test_hidden_invoice_total_uses_half_up",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "to_cents uses float multiplication and round() (banker's rounding) instead of Decimal ROUND_HALF_UP"
+revisions = ["2026-10-14: added hidden pass-to-pass test test_hidden_exact_cent_values_are_unchanged after the M1 smoke run showed an incorrect round(x * 100 + 0.5) patch passing all tests"]

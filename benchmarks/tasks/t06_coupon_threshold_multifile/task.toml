@@ -1,0 +1,14 @@
+id = "t06_coupon_threshold_multifile"
+category = "boundary-condition"
+difficulty = "medium"
+issue_style = "symptom reported in cart total; root cause in a different module"
+fail_to_pass = [
+    "tests/test_cart.py::test_coupon_applies_at_exact_minimum",
+    "tests/test_hidden_shop.py::test_hidden_minimum_spend_boundary",
+    "tests/test_hidden_shop.py::test_hidden_exact_minimum_across_items",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "Coupon.is_applicable uses > instead of >= for the minimum spend"

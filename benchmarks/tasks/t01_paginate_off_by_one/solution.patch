@@ -1,0 +1,11 @@
+diff --git a/pager/core.py b/pager/core.py
+--- a/pager/core.py
++++ b/pager/core.py
+@@ -35,6 +35,6 @@
+     pages = total_pages(len(items), per_page)
+     if page < 1 or page > pages:
+         raise ValueError(f"page {page} out of range 1..{pages}")
+-    start = page * per_page
++    start = (page - 1) * per_page
+     end = start + per_page
+     return Page(list(items[start:end]), page, pages)

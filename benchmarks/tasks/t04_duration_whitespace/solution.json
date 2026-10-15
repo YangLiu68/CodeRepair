@@ -1,0 +1,10 @@
+{
+  "summary": "Remove all whitespace between components before matching, as the docstring promises.",
+  "edits": [
+    {
+      "path": "timefmt/duration.py",
+      "old": "    compact = text.strip().lower()\n",
+      "new": "    compact = \"\".join(text.split()).lower()\n"
+    }
+  ]
+}

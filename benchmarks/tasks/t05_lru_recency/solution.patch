@@ -1,0 +1,11 @@
+diff --git a/cachekit/lru.py b/cachekit/lru.py
+--- a/cachekit/lru.py
++++ b/cachekit/lru.py
+@@ -30,6 +30,7 @@
+             self.misses += 1
+             return default
+         self.hits += 1
++        self._data.move_to_end(key)
+         return value
+ 
+     def put(self, key: K, value: V) -> None:

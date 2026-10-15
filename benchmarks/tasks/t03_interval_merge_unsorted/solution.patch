@@ -1,0 +1,12 @@
+diff --git a/intervals/ops.py b/intervals/ops.py
+--- a/intervals/ops.py
++++ b/intervals/ops.py
+@@ -19,7 +19,7 @@
+     The result is sorted by start and contains no overlapping intervals.
+     """
+     merged: List[Interval] = []
+-    for start, end in map(validate, intervals):
++    for start, end in sorted(map(validate, intervals)):
+         if merged and start <= merged[-1][1]:
+             prev_start, prev_end = merged[-1]
+             merged[-1] = (prev_start, max(prev_end, end))

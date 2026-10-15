@@ -1,0 +1,10 @@
+{
+  "summary": "Compare whole path components instead of a string prefix so sibling directories sharing a prefix are rejected.",
+  "edits": [
+    {
+      "path": "filestore/paths.py",
+      "old": "    if not candidate.startswith(base):\n",
+      "new": "    if os.path.commonpath([base, candidate]) != base:\n"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CodeRepair</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>CodeRepair</h1>
+    <p class="sub">Milestone 1 · read-only retrieval and patch proposal · nothing is executed or written back</p>
+  </header>
+  <main>
+    <nav aria-label="Tasks">
+      <h2>Tasks</h2>
+      <ul id="task-list"></ul>
+      <h2>Recent runs</h2>
+      <ul id="run-list"></ul>
+    </nav>
+    <section id="detail" aria-live="polite">
+      <p class="muted">Select a task.</p>
+    </section>
+  </main>
+  <template id="detail-template">
+    <h2 class="task-title"></h2>
+    <p class="meta"></p>
+    <h3>Issue</h3>
+    <pre class="issue"></pre>
+    <h3>Retrieval</h3>
+    <table class="ranking"><thead><tr><th>Score</th><th>File</th><th>Why</th></tr></thead><tbody></tbody></table>
+    <h3>Propose a patch</h3>
+    <div class="controls">
+      <label>Backend
+        <select class="backend">
+          <option value="oracle">oracle (gold replay, pipeline check)</option>
+          <option value="anthropic">anthropic</option>
+          <option value="ollama">ollama (local)</option>
+        </select>
+      </label>
+      <button type="button" class="propose">Propose</button>
+    </div>
+    <div class="result"></div>
+  </template>
+  <script src="/static/app.js"></script>
+</body>
+</html>

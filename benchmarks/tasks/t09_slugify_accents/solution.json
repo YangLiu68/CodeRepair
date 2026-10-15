@@ -1,0 +1,10 @@
+{
+  "summary": "Decompose accented characters (NFKD) before dropping non-ASCII code points so base letters survive.",
+  "edits": [
+    {
+      "path": "textkit/slug.py",
+      "old": "    ascii_text = text.encode(\"ascii\", \"ignore\").decode(\"ascii\")\n    ascii_text = unicodedata.normalize(\"NFKD\", ascii_text)\n",
+      "new": "    decomposed = unicodedata.normalize(\"NFKD\", text)\n    ascii_text = decomposed.encode(\"ascii\", \"ignore\").decode(\"ascii\")\n"
+    }
+  ]
+}

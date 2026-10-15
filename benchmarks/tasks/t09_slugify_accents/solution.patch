@@ -1,0 +1,14 @@
+diff --git a/textkit/slug.py b/textkit/slug.py
+--- a/textkit/slug.py
++++ b/textkit/slug.py
+@@ -14,8 +14,8 @@
+     characters become a single hyphen, and the slug never starts or ends with a
+     hyphen.
+     """
+-    ascii_text = text.encode("ascii", "ignore").decode("ascii")
+-    ascii_text = unicodedata.normalize("NFKD", ascii_text)
++    decomposed = unicodedata.normalize("NFKD", text)
++    ascii_text = decomposed.encode("ascii", "ignore").decode("ascii")
+     slug = _NON_ALNUM.sub("-", ascii_text.lower()).strip("-")
+     if len(slug) > max_length:
+         slug = slug[:max_length].rstrip("-")

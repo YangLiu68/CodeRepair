@@ -1,0 +1,10 @@
+{
+  "summary": "Minimum spend is inclusive: a coupon applies when the subtotal is greater than or equal to the minimum.",
+  "edits": [
+    {
+      "path": "shop/coupons.py",
+      "old": "        return subtotal_cents > self.min_subtotal_cents\n",
+      "new": "        return subtotal_cents >= self.min_subtotal_cents\n"
+    }
+  ]
+}

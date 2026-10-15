@@ -1,0 +1,12 @@
+diff --git a/timefmt/duration.py b/timefmt/duration.py
+--- a/timefmt/duration.py
++++ b/timefmt/duration.py
+@@ -17,7 +17,7 @@
+         parse_duration("1h30m")   -> 5400
+         parse_duration("2d 4h")   -> 187200
+     """
+-    compact = text.strip().lower()
++    compact = "".join(text.split()).lower()
+     if not _FULL.fullmatch(compact):
+         raise ValueError(f"invalid duration: {text!r}")
+     seconds = 0

@@ -1,0 +1,13 @@
+id = "t09_slugify_accents"
+category = "unicode-handling"
+difficulty = "easy"
+issue_style = "user-visible symptom only; no identifiers or file names"
+fail_to_pass = [
+    "tests/test_hidden_textkit.py::test_hidden_transliterates_accents",
+    "tests/test_hidden_textkit.py::test_hidden_mixed_accents",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "non-ASCII characters are dropped before NFKD normalisation instead of after"

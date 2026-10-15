@@ -1,0 +1,13 @@
+id = "t07_safe_join_prefix_escape"
+category = "security-path-traversal"
+difficulty = "medium"
+issue_style = "security report (CWE-22) with a concrete exploit input"
+fail_to_pass = [
+    "tests/test_hidden_filestore.py::test_hidden_sibling_prefix_rejected",
+    "tests/test_hidden_filestore.py::test_hidden_store_cannot_read_sibling_dir",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "containment check uses str.startswith, so /srv/data-backup passes for base /srv/data"

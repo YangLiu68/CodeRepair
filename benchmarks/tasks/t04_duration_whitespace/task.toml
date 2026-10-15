@@ -1,0 +1,13 @@
+id = "t04_duration_whitespace"
+category = "input-parsing"
+difficulty = "easy"
+issue_style = "traceback with an absolute path from the reporter's machine"
+fail_to_pass = [
+    "tests/test_hidden_timefmt.py::test_hidden_parse_with_spaces",
+    "tests/test_hidden_timefmt.py::test_hidden_humanize_text_with_spaces",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "parse_duration strips only outer whitespace, so documented inner spaces are rejected"

@@ -1,0 +1,18 @@
+diff --git a/notes/models.py b/notes/models.py
+--- a/notes/models.py
++++ b/notes/models.py
+@@ -9,12 +9,12 @@
+ 
+ 
+ class Note:
+-    def __init__(self, title: str, body: str = "", tags: list[str] = []) -> None:
++    def __init__(self, title: str, body: str = "", tags: list[str] | None = None) -> None:
+         if not title.strip():
+             raise ValueError("title must not be empty")
+         self.title = title.strip()
+         self.body = body
+-        self.tags = tags
++        self.tags = [] if tags is None else list(tags)
+         self.created_at = datetime.now(timezone.utc)
+ 
+     def add_tag(self, tag: str) -> None:

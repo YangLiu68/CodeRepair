@@ -1,0 +1,10 @@
+{
+  "summary": "A cache hit in get() must mark the key as most recently used.",
+  "edits": [
+    {
+      "path": "cachekit/lru.py",
+      "old": "        self.hits += 1\n        return value\n",
+      "new": "        self.hits += 1\n        self._data.move_to_end(key)\n        return value\n"
+    }
+  ]
+}

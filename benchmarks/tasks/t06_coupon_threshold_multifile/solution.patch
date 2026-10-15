@@ -1,0 +1,12 @@
+diff --git a/shop/coupons.py b/shop/coupons.py
+--- a/shop/coupons.py
++++ b/shop/coupons.py
+@@ -12,7 +12,7 @@
+ 
+     def is_applicable(self, subtotal_cents: int) -> bool:
+         """A coupon applies once the subtotal reaches its minimum spend."""
+-        return subtotal_cents > self.min_subtotal_cents
++        return subtotal_cents >= self.min_subtotal_cents
+ 
+ 
+ COUPONS = {

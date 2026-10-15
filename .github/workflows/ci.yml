@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - name: Install (locked)
+        run: uv sync --locked --all-extras --python ${{ matrix.python }}
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Unit and acceptance tests
+        run: uv run pytest
+      - name: Validate benchmark fixtures and manifest
+        run: uv run coderepair validate-fixtures
+      - name: Retrieval metrics
+        run: uv run coderepair eval-retrieval
+      - name: Oracle pipeline smoke (mock backend, no secrets)
+        run: |
+          for task in $(uv run coderepair tasks --json | python -c "import json,sys; print(' '.join(t['id'] for t in json.load(sys.stdin)))"); do
+            uv run coderepair propose "$task" --backend oracle --no-save --no-color > /dev/null
+          done

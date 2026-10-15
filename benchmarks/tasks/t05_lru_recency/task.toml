@@ -1,0 +1,14 @@
+id = "t05_lru_recency"
+category = "state-management"
+difficulty = "easy"
+issue_style = "code repro plus failing test id"
+fail_to_pass = [
+    "tests/test_lru.py::test_get_refreshes_recency",
+    "tests/test_hidden_cachekit.py::test_hidden_keys_order_tracks_reads",
+    "tests/test_hidden_cachekit.py::test_hidden_memoize_keeps_hot_entry",
+]
+
+[provenance]
+origin = "original work written for CodeRepair"
+created = "2026-10-14"
+seeded_bug = "LRUCache.get does not move a hit key to the most-recently-used position"

@@ -1,0 +1,15 @@
+{
+  "summary": "Avoid a shared mutable default: default tags to None and give every note its own list.",
+  "edits": [
+    {
+      "path": "notes/models.py",
+      "old": "    def __init__(self, title: str, body: str = \"\", tags: list[str] = []) -> None:\n",
+      "new": "    def __init__(self, title: str, body: str = \"\", tags: list[str] | None = None) -> None:\n"
+    },
+    {
+      "path": "notes/models.py",
+      "old": "        self.tags = tags\n",
+      "new": "        self.tags = [] if tags is None else list(tags)\n"
+    }
+  ]
+}

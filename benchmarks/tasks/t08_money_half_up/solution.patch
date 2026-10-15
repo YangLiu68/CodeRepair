@@ -1,0 +1,18 @@
+diff --git a/ledger/money.py b/ledger/money.py
+--- a/ledger/money.py
++++ b/ledger/money.py
+@@ -1,12 +1,13 @@
+ """Money helpers. Amounts are stored as integer cents."""
+ from __future__ import annotations
+ 
++from decimal import ROUND_HALF_UP, Decimal
+ from typing import List
+ 
+ 
+ def to_cents(amount: str) -> int:
+     """Convert a decimal string such as ``"12.345"`` to cents, rounding half up."""
+-    return round(float(amount) * 100)
++    return int((Decimal(amount) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+ 
+ 
+ def split_evenly(total_cents: int, ways: int) -> List[int]:
