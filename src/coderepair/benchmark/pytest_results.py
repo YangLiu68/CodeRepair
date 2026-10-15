@@ -1,8 +1,13 @@
 """Pytest plugin that records the outcome of every test node id as JSON.
 
-Loaded with ``-p coderepair.benchmark.pytest_results``; writes to the file named by
-``CODEREPAIR_RESULTS_PATH``. Outcomes: passed, failed, error (setup/teardown or
-collection failure), skipped.
+Loaded with ``-p coderepair.benchmark.pytest_results`` on the host, or as
+``-p coderepair_results`` from the sandbox runner bundle. Writes to the file
+named by ``CODEREPAIR_RESULTS_PATH`` and echoes ``CODEREPAIR_RESULTS_NONCE`` so
+the harness can reject stale or missing results. Outcomes: passed, failed,
+error (setup/teardown failure), skipped.
+
+The file is written by code running next to the code under test, so the
+harness treats it as untrusted input (see ``coderepair.sandbox.results``).
 """
 
 from __future__ import annotations
@@ -39,10 +44,13 @@ def pytest_sessionfinish(session, exitstatus) -> None:
     path = os.environ.get("CODEREPAIR_RESULTS_PATH")
     if not path:
         return
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(
-            {"tests": _results, "collect_errors": _collect_errors, "exitstatus": int(exitstatus)},
-            fh,
-            indent=2,
-            sort_keys=True,
-        )
+    payload = {
+        "nonce": os.environ.get("CODEREPAIR_RESULTS_NONCE", ""),
+        "tests": _results,
+        "collect_errors": _collect_errors,
+        "exitstatus": int(exitstatus),
+    }
+    tmp = path + ".partial"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True)
+    os.replace(tmp, path)

@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of kth.",
+  "edits": [
+    {
+      "path": "algo/kth.py",
+      "old": "        return kth(above, k)\n",
+      "new": "        return kth(above, k - num_lessoreq)\n"
+    }
+  ]
+}

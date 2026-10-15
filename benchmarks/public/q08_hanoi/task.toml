@@ -1,0 +1,27 @@
+id = "q08_hanoi"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "failing test provided; observed vs expected outputs"
+fail_to_pass = [
+    "tests/test_hanoi.py::test_hanoi[case1]",
+    "tests/test_hidden_hanoi.py::test_hidden_hanoi[case2]",
+    "tests/test_hidden_hanoi.py::test_hidden_hanoi[case3]",
+    "tests/test_hidden_hanoi.py::test_hidden_hanoi[case4]",
+    "tests/test_hidden_hanoi.py::test_hidden_hanoi[case5]",
+    "tests/test_hidden_hanoi.py::test_hidden_hanoi[case6]",
+    "tests/test_hidden_hanoi.py::test_hidden_hanoi[case7]",
+]
+pass_to_pass = [
+    "tests/test_hanoi.py::test_hanoi[case0]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/hanoi.py"
+upstream_fixed = "correct_python_programs/hanoi.py"
+upstream_cases = "json_testcases/hanoi.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in hanoi (one-line bug)"

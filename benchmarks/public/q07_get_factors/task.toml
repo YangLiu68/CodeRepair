@@ -1,0 +1,26 @@
+id = "q07_get_factors"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "observed vs expected outputs only (issue-only)"
+fail_to_pass = [
+    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case1]",
+    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case2]",
+    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case3]",
+    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case4]",
+    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case5]",
+    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case6]",
+]
+pass_to_pass = [
+    "tests/test_get_factors.py::test_get_factors[case0]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/get_factors.py"
+upstream_fixed = "correct_python_programs/get_factors.py"
+upstream_cases = "json_testcases/get_factors.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in get_factors (one-line bug)"

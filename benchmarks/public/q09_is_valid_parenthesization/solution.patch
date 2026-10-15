@@ -1,0 +1,12 @@
+diff --git a/algo/is_valid_parenthesization.py b/algo/is_valid_parenthesization.py
+--- a/algo/is_valid_parenthesization.py
++++ b/algo/is_valid_parenthesization.py
+@@ -9,7 +9,7 @@
+             if depth < 0:
+                 return False
+ 
+-    return True
++    return depth == 0
+ 
+ 
+ """

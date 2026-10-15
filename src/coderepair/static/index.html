@@ -8,37 +8,73 @@
 </head>
 <body>
   <header>
-    <h1>CodeRepair</h1>
-    <p class="sub">Milestone 1 · read-only retrieval and patch proposal · nothing is executed or written back</p>
-  </header>
-  <main>
-    <nav aria-label="Tasks">
-      <h2>Tasks</h2>
-      <ul id="task-list"></ul>
-      <h2>Recent runs</h2>
-      <ul id="run-list"></ul>
+    <div class="brand">
+      <h1>CodeRepair</h1>
+      <p class="sub">Test-driven repair in a sandbox · every change waits for a human</p>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <button type="button" data-view="tasks" class="tab active">Tasks</button>
+      <button type="button" data-view="runs" class="tab">Runs</button>
+      <button type="button" data-view="benchmark" class="tab">Benchmark</button>
+      <button type="button" data-view="sandbox" class="tab">Sandbox</button>
     </nav>
-    <section id="detail" aria-live="polite">
+  </header>
+
+  <main id="view-tasks" class="view">
+    <aside>
+      <h2>Fixtures</h2>
+      <ul id="task-list-fixtures" class="list"></ul>
+      <h2>Public subset</h2>
+      <ul id="task-list-public" class="list"></ul>
+    </aside>
+    <section id="task-detail" class="panel" aria-live="polite">
       <p class="muted">Select a task.</p>
     </section>
   </main>
-  <template id="detail-template">
+
+  <main id="view-runs" class="view" hidden>
+    <aside>
+      <h2>Recent runs</h2>
+      <ul id="run-list" class="list"></ul>
+    </aside>
+    <section id="run-detail" class="panel" aria-live="polite">
+      <p class="muted">Select a run.</p>
+    </section>
+  </main>
+
+  <main id="view-benchmark" class="view single" hidden>
+    <section id="bench-detail" class="panel" aria-live="polite">
+      <p class="muted">Loading…</p>
+    </section>
+  </main>
+
+  <main id="view-sandbox" class="view single" hidden>
+    <section id="sandbox-detail" class="panel" aria-live="polite">
+      <p class="muted">Loading…</p>
+    </section>
+  </main>
+
+  <template id="task-template">
     <h2 class="task-title"></h2>
     <p class="meta"></p>
     <h3>Issue</h3>
     <pre class="issue"></pre>
     <h3>Retrieval</h3>
     <table class="ranking"><thead><tr><th>Score</th><th>File</th><th>Why</th></tr></thead><tbody></tbody></table>
-    <h3>Propose a patch</h3>
+    <h3>Run the agent</h3>
     <div class="controls">
       <label>Backend
         <select class="backend">
           <option value="oracle">oracle (gold replay, pipeline check)</option>
+          <option value="ollama">ollama (local model)</option>
           <option value="anthropic">anthropic</option>
-          <option value="ollama">ollama (local)</option>
         </select>
       </label>
-      <button type="button" class="propose">Propose</button>
+      <label>Attempts <select class="attempts"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
+      <label>Candidates <select class="candidates"><option selected>1</option><option>2</option><option>3</option></select></label>
+      <label class="check"><input type="checkbox" class="repro"> reproduction test</label>
+      <button type="button" class="primary repair">Repair (sandboxed tests)</button>
+      <button type="button" class="secondary propose">Propose only</button>
     </div>
     <div class="result"></div>
   </template>

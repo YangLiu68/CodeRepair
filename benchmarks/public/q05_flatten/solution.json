@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of flatten.",
+  "edits": [
+    {
+      "path": "algo/flatten.py",
+      "old": "            yield flatten(x)\n",
+      "new": "            yield x\n"
+    }
+  ]
+}

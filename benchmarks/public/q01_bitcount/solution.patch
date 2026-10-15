@@ -1,0 +1,12 @@
+diff --git a/algo/bitcount.py b/algo/bitcount.py
+--- a/algo/bitcount.py
++++ b/algo/bitcount.py
+@@ -2,7 +2,7 @@
+ def bitcount(n):
+     count = 0
+     while n:
+-        n ^= n - 1
++        n &= n - 1
+         count += 1
+     return count
+ 

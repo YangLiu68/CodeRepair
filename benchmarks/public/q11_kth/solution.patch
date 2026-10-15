@@ -1,0 +1,12 @@
+diff --git a/algo/kth.py b/algo/kth.py
+--- a/algo/kth.py
++++ b/algo/kth.py
+@@ -9,7 +9,7 @@
+     if k < num_less:
+         return kth(below, k)
+     elif k >= num_lessoreq:
+-        return kth(above, k)
++        return kth(above, k - num_lessoreq)
+     else:
+         return pivot
+ 

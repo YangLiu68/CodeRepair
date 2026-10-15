@@ -6,70 +6,70 @@
       "issue": "a4d69ad9fb6e6d7cc55d338f307e2481c07f9204304ed0c101982cd7b614fae0",
       "solution": "8cc5772159f81bdc5f7a8a8251527343b6f3bca15104c683d9966b67936de10c",
       "hidden_tests": "13c0e2492f39b3202bef87577f1b8f767e82ebe8b7608c341ba74440815f6474",
-      "task_toml": "9c83616c556b9c69c29d2b3b9cc794d55a990e3c3eab3047cc706c7db383703c"
+      "task_toml": "bd81af914696946440c80960de505317376a71e4c8ee9236a3e02d83300d275e"
     },
     "t02_mutable_default_tags": {
       "repo": "219319ee2eb9ec5587f5b9e93b5ba91baf9317c5eec0ad9804bec2ba12cf387c",
       "issue": "65b03bbd3bca5053db4d2950207043da7e018e8be05ecd1c6f99689c14194fd9",
       "solution": "31f34739b225e28f4bfc5c672fda6a9d43ab66310201e3ce28a706f806ed91d5",
       "hidden_tests": "0faed09d488667e84f1a1323f38a9d0e5d37a7297811121127df168a622ce19a",
-      "task_toml": "cd735628c3b393e8e66cda39f8c795d18f383b949f8d53785f397ae3b72747f2"
+      "task_toml": "e6041a407ef707ed902ea58d5444a60f76cd53cd68891b7ffef488f29db51f55"
     },
     "t03_interval_merge_unsorted": {
       "repo": "0766f0b06c8196e4d5d756e12104e04320ef04ea7ab204cc193c7df918969cc8",
       "issue": "cb983779c5b5e48700399760a81f0cd4ecfc3cc8f5651d892d52ed14ac46b83b",
       "solution": "1a9091543e256a60d4d217581c3e499e7221851c9380ec4c4a76edb78061cf8c",
       "hidden_tests": "39049c396f07b80c92070db95271f7f897e1b2463136c37a3c0c8d264835ef53",
-      "task_toml": "0b0960d9d499d486962c713a8345fcd03f12c2e0a8010bec35b189689444e217"
+      "task_toml": "a1d539df8ea871410b00f6e66a95d2b4a8cff7f5479694191ee47b8fae7f0887"
     },
     "t04_duration_whitespace": {
       "repo": "19221f1c7cc9a24d986c7108d2deb591b344f65dffe332baae92b9b90c99be1d",
       "issue": "d5916af5d7dc312d35da1dd200e4e84550b88b1a7533f3bb98ed00291498bfa8",
       "solution": "37385a489d40d85bf1471eb5f1cb708eafe550efd63e0789165af0e87f06ffe0",
       "hidden_tests": "b367835043dbf8e0b844d9b9d623bf8b85dcf19a854cd86c5a2824e23d805c73",
-      "task_toml": "a148f65719d7db0827be794ce707b708916f91dc3352360e582567eecdbcad45"
+      "task_toml": "e563cb0d895295bde35caae14dbb04acad343b655fa7d04553babde8c1864556"
     },
     "t05_lru_recency": {
       "repo": "1b8b8ac9cda96edf22d616edbd2339eb3412f863c8dd84adf54c4e6e439fdd7b",
       "issue": "d80284e10af87367a845d63c5def47ca0c3d511d27821000291647877f104512",
       "solution": "a84c0d337178fb81c5d08daedb963174679252767cf6f3c1388944a2620ec497",
       "hidden_tests": "3121808741b1a9725ff287a3c8d1a30bf7b35cadea9f24a4ebd1e3d0addf45a2",
-      "task_toml": "55ee0407c2006e206b97d4ca6d13148be91a29239c8e9ef318f3a7247304ef85"
+      "task_toml": "7daa6bcb2e1210d75a3d6f1ee0effd70a2ec0c057f1c2fd7f55303c3c9821f82"
     },
     "t06_coupon_threshold_multifile": {
       "repo": "a1ef4c72031226a52f921d0200f470ee80fea2c48bcfbcdfe4c344cc4705c5ac",
       "issue": "d643479c68364587c7f3910bf16a6ad04c7274d26ef9edb5e45c92785098a11d",
       "solution": "841a542e9d5ef316f67b42379d8eaba12608ec2b6ed6a8d63e4327ebeb43fd02",
       "hidden_tests": "b4ed24533a051bd73dd8161a76ae62f54167f21d94ab4a6f149098b236be7033",
-      "task_toml": "142075fd6b95c229ab373433e3ed723840256dac47128ed3978b3f33438dbdf2"
+      "task_toml": "725987bba51ee1da8ac2d4731312a198fff4466315977c4d1ef929300e37f275"
     },
     "t07_safe_join_prefix_escape": {
       "repo": "edbbae1a73cafb201a5c573a5e788048034a9614df49c7c4fe4dd15e25900ca8",
       "issue": "251c0c8b6a9c2ec247d92725adc9f92c04f3ed17f59aa9aee75de77c48ba0bdd",
       "solution": "c0a112f61ccb61c9cffefbc0f2a03dbe4e8d67ad3e881f1d404150ee6d3615ba",
       "hidden_tests": "fef3a07157e8bed5a58d0c2198c410e6d48fa3fe1206c7b26686d612e5563bb3",
-      "task_toml": "1d47dda0d61d514738c4cd40ba0943ba81012a37dd3cd3765e308bd8e1119928"
+      "task_toml": "50f79e48bde75192b6fc6ba9826284dc976b03f77035e3301ecbef2cf6577e74"
     },
     "t08_money_half_up": {
       "repo": "61d2f1fe01b98ce5bb0816a75e7ec55ae6075be2185fd912a63a88382793bc83",
       "issue": "d280b5b89fd3d4444e74ec2654d30fef303b9f93e264609a343ef6c2367fd253",
       "solution": "6ae0b8bb4ae848c9a5631e0685f6c40377adaad679c563d46bc349da43cbfe9f",
       "hidden_tests": "94e11f96b78a13163520e39dbd6138d1bad6249983ab6e492cdc76e17002d114",
-      "task_toml": "5f0238f04f2ddbad313ce38936cfd691b7a3312e4ad7e9ad07867b0f4e57b449"
+      "task_toml": "b443299ccc5a30308db4efd2cd7c6a715fcf60aeee1fad186df4dcf6a0747f36"
     },
     "t09_slugify_accents": {
       "repo": "3eff781127cdb074ca86e5b7da9be851e4e4dc2d8126f39a8d2c7f03e773ddc8",
       "issue": "8704c4a8c57c26f4c6dbf9417b38ab3edfb5f1cb95b6dff3f0e52f1607bbe06a",
       "solution": "c17de496b3bfa07a80320e7a0a09e0dcdbec323b68e8ae5174f55491fa2a857d",
       "hidden_tests": "bfb3d85cd892f01e6f9cccdb2fa86070a412b0495dc3eb16753f1091090580e9",
-      "task_toml": "01dcd40e2931d9450e4fdf6659d81359e263a456e7d3e6d2db70501e74aaf04c"
+      "task_toml": "bd783141f8ce0dd6beea8e8ce9a3238e7e06dfbec492d5c816cecc8c8fca427d"
     },
     "t10_deep_merge_injection": {
       "repo": "26744469dbe8aa2b3f94bdd46b48af904de0243439bae14f8d332361db075e61",
       "issue": "bad8e69b1bc35a4e9809a9351ce54989831bec1ea1b2b47efb0f4b836f98bb9c",
       "solution": "2daadd9ca1e20d3512304b865906c296d474bea03981a31b1c02fa608d9d6999",
       "hidden_tests": "09e1580f189d9aba0502c1a1c9a7a51bae4dec46da65ef631dcc4fbaf010c4f9",
-      "task_toml": "b3434af9fcc5134d02d94969f7a8cab8942e31276e6a722c0b36afabaed24708"
+      "task_toml": "7cc1e162f2b861e292b192c4f03fc6312a3da681df965509abda93dd76665fa6"
     }
   }
 }

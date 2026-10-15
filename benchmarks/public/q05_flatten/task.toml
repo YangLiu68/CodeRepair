@@ -1,0 +1,26 @@
+id = "q05_flatten"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "observed vs expected outputs only (issue-only)"
+fail_to_pass = [
+    "tests/test_hidden_flatten.py::test_hidden_flatten[case0]",
+    "tests/test_hidden_flatten.py::test_hidden_flatten[case2]",
+    "tests/test_hidden_flatten.py::test_hidden_flatten[case3]",
+    "tests/test_hidden_flatten.py::test_hidden_flatten[case4]",
+    "tests/test_hidden_flatten.py::test_hidden_flatten[case5]",
+    "tests/test_hidden_flatten.py::test_hidden_flatten[case6]",
+]
+pass_to_pass = [
+    "tests/test_flatten.py::test_flatten[case1]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/flatten.py"
+upstream_fixed = "correct_python_programs/flatten.py"
+upstream_cases = "json_testcases/flatten.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in flatten (one-line bug)"

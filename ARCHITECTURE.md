@@ -1,91 +1,186 @@
 # Architecture and threat model
 
-This describes what exists after Milestone 1. Components planned for later milestones are
-marked as such.
-
 ## Pipeline
 
 ```
- issue.md ──► parse_issue ──┐
- (untrusted)                │                         ┌──────────────┐
-                            ▼                         │  LLM backend │  oracle | scripted | anthropic | ollama
+ issue.md ──► parse_issue ──┐                                   LLM backend: oracle | scripted
+ (untrusted)                ▼                                   (mocks) | anthropic | ollama
  repo dir ──► ingest ──► RepoSnapshot ──► RepoIndex ──► rank_files ──► build_prompt ──► complete()
- (untrusted)  policy     (in memory,      grep, AST       reasons        fenced,       │
-              checks      immutable)      symbols,                       redacted      ▼
-                                          imports, BM25                             raw text
-                                                                                       │
-                                     unified diff ◄── apply_proposal ◄── parse_proposal
-                                     (for review)     path policy,       JSON → edits
-                                          │           exact anchors,     (data only)
-                                          ▼           syntax check
-                               runs/<id>/  trace.jsonl, summary.json, prompt.txt,
-                                           proposal.json, proposal.patch
+ (untrusted)  policy     in memory,       grep, AST,     reasons       fenced,              │
+                         immutable        imports, BM25                redacted             ▼
+                                                                                      JSON edits (data)
+                                                                                            │
+   ┌──────────── repair loop (M3) ◄──── feedback: validation errors, anchor hints,  ◄── apply_proposal
+   │                                    sandboxed test results (escaped, redacted)       policy, anchors,
+   ▼                                                                                     syntax, risk flags
+ sandbox (M2): visible tests on a throwaway patched copy ──► candidates (M4): extra samples,
+ Docker  --network none, non-root, read-only, limits        reproduction test, lint/type delta,
+ Seatbelt deny-default profile, rlimits, watchdog            security review ──► ranked scorecards
+                                                                                     │
+                       runs/<id>/ trace, prompts, attempts, candidate patches  ◄─────┘
+                                                                                     │
+                 human: coderepair review → approve (approval.json) → apply (no git, no push)
 ```
 
-Nothing in this pipeline writes to the repository or executes repository code, `git`, or model output.
+The agent never writes to the repository it reads. Only `coderepair apply`, after an explicit
+`coderepair approve`, edits a working tree, and it never runs `git`, commits, pushes or merges.
 
 | Module | Responsibility |
 |---|---|
 | `security.py` | Repository root policy (allowed roots, `$HOME` and credential-directory denylist), sensitive-file rules, secret redaction, prompt-injection scanner |
-| `repo.py` | Walks the repo without following symlinks, opens files with `O_NOFOLLOW`, skips sensitive files *before reading*, binary and oversized files, and ignored directories; reads `.git/HEAD` as text |
-| `issue.py` | Title, code blocks, traceback frames, exception, file/identifier/test-id mentions, injection findings |
-| `search.py` | Literal/regex grep (regex length and line-length caps), `ast` symbol index, import graph, BM25 |
-| `retrieval.py` | Combines BM25, path mentions, traceback frames, symbol definitions, failing-test imports and import propagation; every score comes with human-readable reasons |
-| `prompting.py` | Context selection under a character budget; untrusted-data tags with escaped closing tags; secret redaction; harness note when injection text is present |
-| `patch.py` | `PatchProposal` schema, tolerant JSON extraction, path policy, exact-unique anchor matching (with a unique trailing-whitespace fallback), all-or-nothing application, `ast` syntax check, size limits, risk flags, git-compatible unified diffs |
-| `agent.py` | Orchestrates one proposal, records the trace, writes run artifacts (`0700` directory) |
-| `llm/` | `LLMBackend` protocol; `ScriptedBackend`; `AnthropicBackend` (structured output via `output_config.format`, `fallbacks="default"`); `OllamaBackend` (`format` JSON schema, temperature 0) |
-| `benchmark/` | Harness-only: task registry, `OracleBackend`, fixture validator, manifest, retrieval evaluation |
-| `api.py`, `static/` | Local FastAPI service and a minimal diff viewer |
+| `repo.py` | Read-only ingestion: no symlink following (`O_NOFOLLOW`), sensitive files skipped before reading, binary/oversized files skipped, `.git/HEAD` read as text |
+| `issue.py`, `search.py`, `retrieval.py` | Issue hints; grep, AST symbols, import graph, BM25; ranked files with human-readable reasons |
+| `prompting.py` | Context under a character budget, untrusted-data tags with escaped closing tags, redaction, injection note; the no-retrieval prompt for the `direct` baseline; the reproduction-test prompt |
+| `patch.py` | Edit schema, path policy (tests, CI, build files protected; no new files), exact-unique anchors, all-or-nothing application, syntax check, risk flags, unified diffs |
+| `agent.py` | Context building, one model call + validation (`attempt_proposal`), single-shot `propose_patch` |
+| `sandbox/` | M2: run directory, runner bundle, Docker and Seatbelt backends, process monitor, untrusted results parsing, abuse probes |
+| `execution.py` | The only path that executes repository code: snapshot + overlay → sandbox |
+| `loop.py` | M3: baseline → attempt → targeted tests → full tests → feedback, under attempt/token/time budgets |
+| `candidates.py`, `checks.py` | M4: extra samples, reproduction test, lint/type deltas, AST security review, ranking |
+| `approval.py` | M4: approval records and verified write-back |
+| `benchmark/` | Harness side: tasks, oracle, fixture validator, hidden-test evaluation, comparative benchmark, manifests |
+| `api.py`, `static/` | Local FastAPI service and dashboard |
 
 ### Why search/replace edits instead of unified diffs from the model
 
 Exact anchors are easy to validate (must occur exactly once), cannot address paths implicitly, and
 fail closed. The unified diff shown to the reviewer is generated by CodeRepair from the validated
-edits, so it is always well formed (`git apply --check` is part of the test suite).
+edits, so it is always well formed (`git apply --check` is part of the test suite). In the loop,
+an anchor that does not match is answered with the closest real lines of the file.
 
 ### Why `git` is never run on an ingested repository
 
 Repository-controlled configuration can make ordinary `git status`/`git diff` run arbitrary
-commands (`core.fsmonitor`, clean/smudge filters, external diff drivers, hooks). M1 needs only the
-commit id, which is read from `.git/HEAD` and refs as text, with the ref name validated so a
-crafted `HEAD` cannot point outside `.git/`. When M4 writes approved patches back, it will use a
-hardened wrapper with allowlisted subcommands and those config keys forced off.
+commands (`core.fsmonitor`, clean/smudge filters, external diff drivers, hooks). The commit id is
+read from `.git/HEAD` as text. Write-back (`apply`) uses plain file writes after re-verifying the
+repository content, so it needs no git either.
+
+## Sandbox (Milestone 2)
+
+Every execution of repository or model-written code goes through `execution.run_repo_tests`:
+
+1. A run directory is created with mode `0700`: `workspace/` (written from the in-memory snapshot
+   plus the patch overlay and, for scoring only, hidden tests), `tmp/` and `out/`.
+2. The sandbox runs one fixed command: `python -I -S -B bootstrap.py <pytest options>`, with
+   pytest taken from the **runner bundle**, a content-addressed, read-only directory of pure-Python
+   packages copied from the locked environment (pytest, pluggy, iniconfig, packaging, pygments) plus
+   the results plugin. The image or host needs nothing else and nothing is downloaded at test time.
+3. Per-test outcomes come back through a results file that is treated as untrusted (below).
+
+| Control | Docker backend | Seatbelt backend (macOS fallback) |
+|---|---|---|
+| Network | `--network none` | deny-default profile: no sockets, DNS, Unix sockets |
+| User | invoking uid (never root), `--cap-drop ALL`, `no-new-privileges`, default seccomp | the invoking user, inside the profile |
+| Filesystem | read-only root, workspace and bundle mounted read-only, `/tmp` tmpfs, only `/out` writable | reads: OS, Python `lib`, bundle, run dir; metadata only for their parents; writes: `tmp/`, `out/` |
+| Processes | `--pids-limit`, `--init` | `fork`/`exec` denied; signals only to itself; other processes' info denied |
+| Memory | `--memory` = `--memory-swap` | watchdog on physical footprint (macOS ignores memory rlimits) |
+| CPU / time | `--cpus 1`, `ulimit cpu`, host-side deadline + `docker kill` | `RLIMIT_CPU`, host-side deadline, process-group kill |
+| Disk / output | tmpfs size, `fsize` ulimit, watchdog on `/out`; output capped | `RLIMIT_FSIZE`, scratch-size scan, cumulative disk-write cap; output capped |
+| Environment | explicit `--env` list only | replaced, not filtered |
+| Secrets / sockets | nothing mounted besides workspace, bundle, `/out` | `$HOME`, `~/.ssh`, project files and runtime sockets unreadable |
+
+`auto` picks Docker when a daemon and the image are present, then Seatbelt on macOS, and otherwise
+refuses to run anything. There is no unsandboxed fallback. Seatbelt is labelled everywhere as
+weaker than a container: it shares the host kernel, and `sandbox-exec` is deprecated by Apple
+(although it still ships and other developer tools rely on it).
+
+**Abuse probes** (`sandbox/probes.py`, `coderepair sandbox selftest`): network egress, loopback,
+DNS and container-runtime sockets; reading a canary secret, `$HOME`, `~/.ssh` and benchmark
+solutions; symlink escapes; writes outside the scratch area or into the workspace; inherited
+environment; reading another process's arguments and environment; signalling host processes;
+fork bombs; memory, CPU, sleep, output, disk and file-size exhaustion; early exit, forged results
+and a FIFO planted at the results path. Containment is judged on the host (canary absent from all
+output and files, listener got no connection, sentinel alive, workspace unchanged), and a negative
+control shows that the probes do report escapes when isolation is removed.
+
+### Trust in test outcomes
+
+The results plugin runs in the same process as the code under test, so a hostile patch could forge
+results. The harness therefore accepts results only if the file is a regular file (opened with
+`O_NOFOLLOW | O_NONBLOCK`), is small, has the expected shape, carries the run's nonce, and matches
+the process exit status; a session that hit any limit is never scored. Hidden-test scoring counts a
+missing test as failed. These checks stop crashes, early exits, stale files and naive forgery, but
+not a patch that deliberately reads the nonce and writes a convincing report. That residual risk is
+why test outcomes are evidence for a reviewer rather than an authorisation, why risky constructs are
+flagged in review, and why nothing is applied without a human approval.
+
+## Repair loop (Milestone 3)
+
+`loop.repair` first runs the visible tests on the unpatched repository (baseline). Each attempt is a
+complete patch against the original snapshot (attempts never compound). A valid patch runs
+*targeted* tests first (files with baseline failures, files named in the issue, test files that
+import a changed module directly or through one module); if they pass, the full visible suite runs.
+Feedback to the next attempt contains validation errors, anchor hints, the diff, a result summary
+and the tail of the pytest output, all redacted and tag-escaped, with an injection warning when
+the scanner fires. Identical patches are not re-tested. The loop stops on success or when the
+attempt, token or wall-time budget is used up.
+
+Status semantics: **fixed** means every visible test passes and every test that failed at baseline
+now passes (or a model-written reproduction test that failed on the original code passes);
+**unverified** means the suite is green but nothing demonstrated the bug, which is what happens on
+issue-only tasks without a reproduction test; **failed** and **error** are what they say.
+
+## Candidates, checks and approval (Milestone 4)
+
+* **Samples:** after the loop, independent samples (`sample_index` > 0; Ollama uses temperature 0.7
+  with a fixed seed) until the requested number of passing candidates exists or the budget ends.
+* **Reproduction test:** the model writes a pytest module for the issue. It must parse, contain
+  test functions, import only pytest, the standard library and the repository's modules, avoid a
+  denylist of process/network/dynamic-code APIs, and *fail* on the original code in the sandbox.
+  A candidate on which it passes is `verified`.
+* **Static checks** run on the host but never import the code: `ruff --isolated` (pyflakes and
+  bugbear rules) and `mypy` with an empty config file (no repository plugins), before and after the
+  patch, reporting only newly introduced diagnostics. A missing tool is reported as `skipped`.
+* **Security review** compares the AST before and after the patch: new process execution, dynamic
+  code, unsafe deserialisation, network, native code, `shell=True`, `verify=False`, destructive
+  filesystem calls, hard-coded secrets, and removed `raise` statements.
+* **Ranking** (highest first): visible tests all pass, no regressions, reproduction test verified,
+  fewer high-severity findings, fewer new type errors, fewer new lint errors, fewer medium findings,
+  smaller diff. Every scorecard lists its reasons.
+* **Approval:** `coderepair approve` refuses candidates with failing tests, regressions,
+  high-severity findings or new lint/type errors unless `--acknowledge-risks` is given, and records
+  reviewer, OS user, time, diff SHA-256 and the acknowledged risks in a `0600` file. Approvals are
+  final. `coderepair apply` re-ingests the repository under the path policy, re-applies the edits,
+  and writes only if the result is byte-identical to the approved diff; benchmark directories are
+  protected.
 
 ## Trust boundaries
 
 | Input | Trust | Handling |
 |---|---|---|
-| Repository files | Untrusted | Read-only snapshot; never executed; fenced in prompts |
+| Repository files | Untrusted | Read-only snapshot; executed only in the sandbox; fenced in prompts |
 | Issue text | Untrusted (even when authorized) | Parsed for hints only; fenced in prompts |
-| Model output | Untrusted | Parsed as JSON data into edits; validated; never executed |
-| Benchmark fixtures (`benchmarks/tasks`) | First-party | The only code run on the host, by `validate-fixtures`, on temp copies |
-| Operator (CLI flags, env) | Trusted | Chooses allowed roots and backend |
-
-"Authorized issue" in M1 means an issue that the operator supplies for a registered task or a
-repository under `CODEREPAIR_ALLOWED_ROOTS`. There is no remote issue intake.
+| Model output | Untrusted | Parsed as JSON edits; validated; executed only as part of tests in the sandbox |
+| Test output and results files | Untrusted | Size-capped, control characters removed, nonce-checked, escaped and redacted before reuse |
+| First-party fixtures (`benchmarks/tasks`) | Trusted | May be validated on the host (temp copy, scrubbed env); `--sandbox` runs them sandboxed |
+| Public subset (`benchmarks/public`) | Third-party | Always run in the sandbox |
+| Operator (CLI flags, env) and reviewer | Trusted | Choose allowed roots, backend and sandbox; approve and apply |
 
 ## Threat model
 
-| # | Threat | Mitigation in M1 | Residual risk / later work |
+| # | Threat | Mitigation | Residual risk |
 |---|---|---|---|
-| T1 | Prompt injection in repo or issue steers the model | Untrusted-data tags, escaped closing tags, injection scanner with warnings and a harness note, system prompt rule; the model has no tools | The model can still be fooled into a harmful *patch*; caught by T2/T3 controls and human review. Scanner is line-based regex (multi-line payloads can slip through) |
-| T2 | Model output gets executed | No code path executes model output; output is JSON → edits | — |
-| T3 | Patch escapes the repo or touches sensitive or protected files | Normalized relative paths only, no `..`, existing files only, tests/CI/build/script files protected, sensitive names blocked | New-file creation is disallowed in M1; revisit with an allowlist |
-| T4 | Patch "fixes" the bug by editing tests | Tests are protected; hidden held-out tests per task | Tests that under-specify behaviour can still be gamed (one found and fixed in t08; see BENCHMARK.md) |
-| T5 | Repository code runs on the host | The agent never runs it; fixture validation is restricted to the first-party root and refuses symlinks | M2: disposable container, `--network none`, non-root, CPU/memory/pids/time limits, read-only mounts, no secrets, no Docker socket |
-| T6 | Git configuration leads to code execution | `git` is never run on ingested repos | M4 hardened wrapper |
-| T7 | Ingestion reads secrets or follows links out of the repo | Allowed roots plus denylist; `realpath` checks; symlinks skipped; `O_NOFOLLOW`; sensitive names skipped before read; size and count limits | Secrets in ordinary file names are only caught by redaction (T8) |
-| T8 | Secrets in source sent to an LLM provider | Regex redaction of common key formats and secret assignments, reported as warnings | Regex redaction is best-effort; Ollama keeps data local |
-| T9 | Source repo changed without approval | Snapshot is in memory; nothing is written | M4: explicit human approval before any write-back; never push or merge |
-| T10 | Local API abused from a browser (DNS rebinding, CSRF, XSS via diff text) | Loopback bind by default, `TrustedHostMiddleware`, JSON-only POST bodies, CSP without inline script, `textContent` rendering, task and run ids validated, no client-supplied paths | No authentication; do not expose beyond localhost |
-| T11 | Solutions or hidden tests leak into prompts | Agent reads only `repo/` and `issue.md`; tests assert no gold-added line or hidden-test line appears in any prompt; oracle results are labelled and never reported as metrics | M6 public tasks need date and contamination controls |
-| T12 | Resource exhaustion | File size, file count and total byte caps; prompt character budget; patch size limits; regex length cap; LLM timeouts | Python `re` has no timeout; regex search is only exposed to the human operator |
-| T13 | Code under test tampers with its own results | n/a in M1 (only first-party fixtures run) | M2: treat in-sandbox results as untrusted; run hidden tests in a fresh container; cap and sanitize result files |
-| T14 | Dependency supply chain | Few dependencies, `uv.lock`, CI with read-only token and no secrets | Add dependency audit in M7 |
+| T1 | Prompt injection in repo, issue or test output steers the model | Untrusted-data tags with escaped closing tags (also for test output and feedback), injection scanner with harness notes, system prompt rule, model has no tools | The model can still be talked into a harmful *patch*; caught by T2/T3/T15 controls and human review. Scanner is regex-based |
+| T2 | Model output gets executed outside isolation | Model output is data; it only runs as part of a test session in the sandbox | — |
+| T3 | Patch escapes the repo or touches sensitive or protected files | Normalized relative paths, no `..`, existing files only, tests/CI/build/script/conftest files protected, sensitive names blocked | New files are not allowed (reproduction tests are harness-placed) |
+| T4 | Patch "fixes" the bug by editing or skipping tests | Tests protected; hidden tests; missing tests count as failures; "fixed" requires baseline failures to pass, not vanish | Weak tests can still be gamed (t08 had one; fixed) |
+| T5 | Repository or patch code harms the host | Sandbox (above) with 15 abuse probes and negative controls | Seatbelt shares the kernel; Docker path is verified only by command-line tests here (no Docker on the dev machine) |
+| T6 | Git configuration leads to code execution | `git` is never run on ingested repositories, including during apply | — |
+| T7 | Ingestion reads secrets or follows links out of the repo | Allowed roots, denylist, `realpath`, `O_NOFOLLOW`, sensitive names skipped before read | Secrets in ordinary file names only caught by redaction |
+| T8 | Secrets sent to an LLM provider | Regex redaction (prompts, feedback, test output) | Best effort; Ollama keeps data local |
+| T9 | Repository changed without approval, or after approval | Only `apply` writes, only after `approve`; diff hash and byte-identical re-application are checked | The approver is trusted; there is no multi-party approval |
+| T10 | Local API abused from a browser | Loopback bind, `TrustedHostMiddleware`, JSON-only bodies, CSP without inline script, `textContent` rendering, validated ids | No authentication; do not expose beyond localhost |
+| T11 | Solutions or hidden tests leak into prompts | Agent reads only `repo/` and `issue.md`; tests check every prompt for gold-added and hidden-test lines; the loop sees visible tests only | Public tasks may be memorised by models (contamination; see BENCHMARK.md) |
+| T12 | Resource exhaustion of the harness | Ingestion and prompt caps, patch size limits, sandbox limits, bounded output capture, results size and count limits, budgets in the loop | Python `re` has no timeout (operator-only search) |
+| T13 | Code under test tampers with its own results | Nonce, exit-status match, regular-file check, size/shape validation, limits invalidate sessions, missing tests fail | Deliberate forgery with the real nonce is possible; see "Trust in test outcomes" |
+| T14 | Dependency supply chain | Few dependencies, `uv.lock`, CI with read-only token and no secrets; the runner bundle is copied from the locked environment and content-addressed | No automated vulnerability audit yet |
+| T15 | Harmful but test-passing patch | AST security review, lint/type deltas, risk flags, mandatory acknowledgement at approval | Review is heuristic; a human must read the diff |
+| T16 | Sandboxed code reads other processes' secrets | `(deny process-info*)` and a sysctl allowlist (Seatbelt); PID namespace (Docker); probe with a sentinel holding a canary in argv and env | Found and fixed during the M2 review: macOS's `(deny default)` does not cover process-info |
 
 ## Data written to disk
 
-`runs/<run_id>/` (git-ignored, mode `0700`): the full prompt as sent (after redaction), the raw model
-response, the parsed proposal, validation results, the diff and a JSON-lines trace. The source
-repository is never written.
+`runs/<run_id>/` (git-ignored, mode `0700`): prompts as sent (after redaction), raw responses,
+parsed proposals, validation results, sandbox summaries, per-attempt and per-candidate patches,
+scorecards, the reproduction test, a JSON-lines trace, and approval records (`0600`). Run
+directories for sandboxed sessions live under the system temp directory and are deleted after
+each session.

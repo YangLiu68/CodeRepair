@@ -1,11 +1,13 @@
 """Validate first-party benchmark fixtures by running their tests.
 
-SECURITY NOTE: this is the one place where repository code runs on the host.
-It is allowed only for first-party fixtures that live under an explicitly trusted
-root (``benchmarks/tasks`` in this project), runs on a throwaway copy, with a
-scrubbed environment, ``HOME``/``TMPDIR`` pointed at a temp dir, third-party
-pytest plugin autoloading disabled, and a timeout. Untrusted repositories are
-executed only inside the Milestone 2 sandbox, never through this module.
+By default the fixtures' tests run on the host (``HostFixtureRunner``). That is
+the one place where repository code runs outside a sandbox, and it is allowed
+only for first-party fixtures under an explicitly trusted root
+(``benchmarks/tasks``), on a throwaway copy, with a scrubbed environment,
+``HOME``/``TMPDIR`` pointed at a temp dir, third-party pytest plugin
+autoloading disabled, and a timeout. ``SandboxFixtureRunner`` runs the same
+checks inside a sandbox (``coderepair validate-fixtures --sandbox auto``).
+Model-written code is never executed through this module.
 """
 
 from __future__ import annotations
@@ -19,9 +21,12 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
+from ..execution import run_repo_tests
 from ..patch import apply_proposal
 from ..repo import ingest_repository
+from ..sandbox.base import Sandbox, SandboxLimits
 from .tasks import TaskSpec
 
 RESULTS_PLUGIN = "coderepair.benchmark.pytest_results"
@@ -117,6 +122,65 @@ def run_fixture_tests(workdir: Path, label: str, timeout_s: int) -> TestRun:
         shutil.rmtree(scratch, ignore_errors=True)
 
 
+class FixtureRunner(Protocol):
+    def __call__(self, task: TaskSpec, label: str, *, gold: bool, hidden: bool) -> TestRun: ...
+
+
+class HostFixtureRunner:
+    """Trusted first-party fixtures only: run on a temp copy on the host."""
+
+    name = "host"
+
+    def __init__(self, timeout_s: int = 120) -> None:
+        self.timeout_s = timeout_s
+
+    def __call__(self, task: TaskSpec, label: str, *, gold: bool, hidden: bool) -> TestRun:
+        with tempfile.TemporaryDirectory(prefix=f"coderepair-{task.id}-") as tmp:
+            workdir = materialize(task, Path(tmp) / label, gold=gold, hidden=hidden)
+            return run_fixture_tests(workdir, label, self.timeout_s)
+
+
+class SandboxFixtureRunner:
+    """Run fixture tests in a sandbox, exactly as candidate patches are run."""
+
+    def __init__(self, sandbox: Sandbox, limits: SandboxLimits | None = None) -> None:
+        self.sandbox = sandbox
+        self.name = sandbox.name
+        self.limits = limits
+
+    def __call__(self, task: TaskSpec, label: str, *, gold: bool, hidden: bool) -> TestRun:
+        snapshot = ingest_repository(task.repo_dir, (task.dir,))
+        overlay = {}
+        if gold:
+            patch = apply_proposal(snapshot, task.load_solution())
+            if not patch.ok:
+                raise ValueError(f"gold solution does not apply: {patch.errors}")
+            overlay = patch.changed_files
+        result = run_repo_tests(
+            snapshot,
+            self.sandbox,
+            overlay=overlay,
+            extra_files=task.hidden_test_overlay() if hidden else None,
+            limits=self.limits,
+        )
+        if not result.completed:
+            problems = list(result.problems)
+            if result.limit_exceeded:
+                problems.append(f"{result.limit_exceeded} limit exceeded")
+            problems = problems or ["incomplete test session"]
+            return TestRun(
+                label, {}, [f"<{p}>" for p in problems], result.exit_code or -1, result.duration_s
+            )
+        return TestRun(
+            label,
+            dict(result.results.outcomes),
+            list(result.results.collect_errors),
+            result.results.exitstatus,
+            result.duration_s,
+            (result.stdout + result.stderr)[-4000:],
+        )
+
+
 def materialize(task: TaskSpec, dest: Path, *, gold: bool, hidden: bool) -> Path:
     """Copy the buggy repo to ``dest``, optionally applying gold edits and hidden tests."""
     shutil.copytree(
@@ -158,9 +222,16 @@ def _check_structure(task: TaskSpec) -> list[str]:
     return problems
 
 
-def validate_task(task: TaskSpec, *, trusted_root: Path, timeout_s: int = 120) -> TaskValidation:
+def validate_task(
+    task: TaskSpec,
+    *,
+    trusted_root: Path,
+    timeout_s: int = 120,
+    runner: FixtureRunner | None = None,
+) -> TaskValidation:
     """Check that a fixture is a well-formed, reproducible seeded-bug task."""
     _assert_trusted(task, trusted_root)
+    runner = runner or HostFixtureRunner(timeout_s)
     report = TaskValidation(task.id)
     report.problems.extend(_check_structure(task))
     if report.problems:
@@ -177,15 +248,12 @@ def validate_task(task: TaskSpec, *, trusted_root: Path, timeout_s: int = 120) -
     else:
         report.problems.append("solution.patch missing; run `coderepair build-fixtures`")
 
-    with tempfile.TemporaryDirectory(prefix=f"coderepair-{task.id}-") as tmp:
-        tmp_path = Path(tmp)
-        runs = {
-            "buggy_visible": materialize(task, tmp_path / "bv", gold=False, hidden=False),
-            "buggy_all": materialize(task, tmp_path / "ba", gold=False, hidden=True),
-            "gold_all": materialize(task, tmp_path / "ga", gold=True, hidden=True),
-        }
-        for label, workdir in runs.items():
-            report.runs[label] = run_fixture_tests(workdir, label, timeout_s)
+    for label, use_gold, use_hidden in (
+        ("buggy_visible", False, False),
+        ("buggy_all", False, True),
+        ("gold_all", True, True),
+    ):
+        report.runs[label] = runner(task, label, gold=use_gold, hidden=use_hidden)
 
     collection_problems = [
         f"{label}: collection errors {run.collect_errors}"
@@ -223,6 +291,13 @@ def validate_task(task: TaskSpec, *, trusted_root: Path, timeout_s: int = 120) -
         report.problems.append("buggy and gold runs collected different tests")
     if not (f2p & hidden_ids):
         report.problems.append("no hidden test detects the bug")
+    p2p_actual = {t for t, o in buggy_all.outcomes.items() if o == "passed"}
+    if p2p_actual != set(task.pass_to_pass):
+        report.problems.append(
+            "pass_to_pass in task.toml does not match the passing tests: "
+            f"missing {sorted(p2p_actual - set(task.pass_to_pass))}, "
+            f"extra {sorted(set(task.pass_to_pass) - p2p_actual)}"
+        )
 
     report.counts = {
         "visible_tests": len(buggy_vis.outcomes),

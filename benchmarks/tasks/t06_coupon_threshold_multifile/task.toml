@@ -7,6 +7,16 @@ fail_to_pass = [
     "tests/test_hidden_shop.py::test_hidden_minimum_spend_boundary",
     "tests/test_hidden_shop.py::test_hidden_exact_minimum_across_items",
 ]
+pass_to_pass = [
+    "tests/test_cart.py::test_coupon_applies_above_minimum",
+    "tests/test_cart.py::test_coupon_ignored_below_minimum",
+    "tests/test_cart.py::test_subtotal_sums_line_items",
+    "tests/test_coupons.py::test_lookup_is_case_insensitive",
+    "tests/test_coupons.py::test_unknown_coupon",
+    "tests/test_pricing.py::test_discount_rejects_bad_percent",
+    "tests/test_pricing.py::test_discount_rounds_down",
+    "tests/test_pricing.py::test_format_cents",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

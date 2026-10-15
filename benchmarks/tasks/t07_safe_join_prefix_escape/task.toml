@@ -6,6 +6,15 @@ fail_to_pass = [
     "tests/test_hidden_filestore.py::test_hidden_sibling_prefix_rejected",
     "tests/test_hidden_filestore.py::test_hidden_store_cannot_read_sibling_dir",
 ]
+pass_to_pass = [
+    "tests/test_hidden_filestore.py::test_hidden_base_itself_is_allowed",
+    "tests/test_paths.py::test_absolute_part_rejected",
+    "tests/test_paths.py::test_dotdot_inside_base_is_allowed",
+    "tests/test_paths.py::test_join_simple",
+    "tests/test_paths.py::test_parent_escape_rejected",
+    "tests/test_store.py::test_escape_rejected",
+    "tests/test_store.py::test_roundtrip",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

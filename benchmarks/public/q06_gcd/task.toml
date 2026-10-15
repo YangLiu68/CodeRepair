@@ -1,0 +1,25 @@
+id = "q06_gcd"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "failing test provided; observed vs expected outputs"
+fail_to_pass = [
+    "tests/test_gcd.py::test_gcd[case1]",
+    "tests/test_hidden_gcd.py::test_hidden_gcd[case2]",
+    "tests/test_hidden_gcd.py::test_hidden_gcd[case3]",
+    "tests/test_hidden_gcd.py::test_hidden_gcd[case4]",
+    "tests/test_hidden_gcd.py::test_hidden_gcd[case5]",
+]
+pass_to_pass = [
+    "tests/test_gcd.py::test_gcd[case0]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/gcd.py"
+upstream_fixed = "correct_python_programs/gcd.py"
+upstream_cases = "json_testcases/gcd.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in gcd (one-line bug)"

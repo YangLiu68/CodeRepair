@@ -14,6 +14,10 @@ dependencies = [
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=1.0"]
+checks = [
+    "mypy>=1.11",
+    "ruff>=0.6",
+]
 
 [project.scripts]
 coderepair = "coderepair.cli:main"
@@ -39,7 +43,7 @@ addopts = "-q -p no:cacheprovider"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["benchmarks/tasks"]
+extend-exclude = ["benchmarks/tasks", "benchmarks/public"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S"]

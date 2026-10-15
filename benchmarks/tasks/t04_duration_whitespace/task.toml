@@ -6,6 +6,18 @@ fail_to_pass = [
     "tests/test_hidden_timefmt.py::test_hidden_parse_with_spaces",
     "tests/test_hidden_timefmt.py::test_hidden_humanize_text_with_spaces",
 ]
+pass_to_pass = [
+    "tests/test_duration.py::test_format_roundtrip",
+    "tests/test_duration.py::test_parse_compact[1h30m-5400]",
+    "tests/test_duration.py::test_parse_compact[2d4h-187200]",
+    "tests/test_duration.py::test_parse_compact[45M-2700]",
+    "tests/test_duration.py::test_parse_compact[90s-90]",
+    "tests/test_duration.py::test_parse_rejects_garbage",
+    "tests/test_duration.py::test_parse_rejects_out_of_order_units",
+    "tests/test_hidden_timefmt.py::test_hidden_still_rejects_garbage_with_spaces",
+    "tests/test_humanize.py::test_humanize_multiple_units",
+    "tests/test_humanize.py::test_humanize_text",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

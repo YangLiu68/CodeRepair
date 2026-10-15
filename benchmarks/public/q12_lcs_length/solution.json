@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of lcs_length.",
+  "edits": [
+    {
+      "path": "algo/lcs_length.py",
+      "old": "                dp[i, j] = dp[i - 1, j] + 1\n",
+      "new": "                dp[i, j] = dp[i - 1, j - 1] + 1\n"
+    }
+  ]
+}

@@ -28,7 +28,8 @@ def test_untrusted_host_header_is_rejected(client):
 
 def test_task_list_and_detail_expose_only_agent_visible_data(client):
     tasks = client.get("/api/tasks").json()
-    assert len(tasks) == 10
+    assert len(tasks) == 22
+    assert {t["id"][0] for t in tasks} == {"t", "q"}
     detail = client.get(f"/api/tasks/{TASK}")
     assert detail.status_code == 200
     body = detail.json()
@@ -85,3 +86,39 @@ def test_viewer_is_served(client):
     assert script.status_code == 200
     for sink in (".innerHTML", ".outerHTML", "insertAdjacentHTML", "document.write"):
         assert sink not in script.text
+
+
+def test_state_changing_requests_need_json_from_the_same_origin(client):
+    url = f"/api/tasks/{TASK}/proposals"
+    cross = client.post(url, json={"backend": "oracle"}, headers={"Origin": "https://evil.example"})
+    assert cross.status_code == 403
+    form = client.post(url, content="backend=oracle", headers={"Content-Type": "text/plain"})
+    assert form.status_code == 415
+    loopback = {"Origin": "http://127.0.0.1:8000", "Host": "127.0.0.1:8000"}
+    assert client.post(url, json={"backend": "oracle"}, headers=loopback).status_code == 200
+    other_port = {"Origin": "http://127.0.0.1:9999", "Host": "127.0.0.1:8000"}
+    assert client.post(url, json={"backend": "oracle"}, headers=other_port).status_code == 403
+    assert client.post(url, json={"backend": "oracle"}).status_code == 200  # non-browser client
+
+
+def test_sandbox_and_benchmark_endpoints(client):
+    info = client.get("/api/sandbox").json()
+    assert {b["name"] for b in info["backends"]} == {"docker", "seatbelt"}
+    listing = client.get("/api/benchmarks")
+    assert listing.status_code == 200
+    assert client.get("/api/benchmarks/..%2F..%2Fetc").status_code == 404
+    assert client.get("/api/benchmarks/nope").status_code == 404
+
+
+def test_repair_and_approval_round_trip(client, sandbox):
+    run = client.post(f"/api/tasks/{TASK}/repairs", json={"backend": "oracle", "max_attempts": 1})
+    assert run.status_code == 200, run.text
+    body = run.json()
+    assert body["mode"] == "repair-loop" and body["status"] == "fixed"
+    detail = client.get(f"/api/runs/{body['run_id']}").json()
+    assert detail["candidate_patches"]["1"] == body["diff"] and detail["approval"] is None
+    approval = client.post(f"/api/runs/{body['run_id']}/approval", json={"reviewer": "dana"})
+    assert approval.status_code == 200 and approval.json()["reviewer"] == "dana"
+    again = client.post(f"/api/runs/{body['run_id']}/approval", json={"reviewer": "eve"})
+    assert again.status_code == 409
+    assert client.get(f"/api/runs/{body['run_id']}").json()["approval"]["reviewer"] == "dana"

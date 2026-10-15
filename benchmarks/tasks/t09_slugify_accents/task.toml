@@ -6,6 +6,16 @@ fail_to_pass = [
     "tests/test_hidden_textkit.py::test_hidden_transliterates_accents",
     "tests/test_hidden_textkit.py::test_hidden_mixed_accents",
 ]
+pass_to_pass = [
+    "tests/test_hidden_textkit.py::test_hidden_non_latin_letters_are_dropped",
+    "tests/test_slug.py::test_basic",
+    "tests/test_slug.py::test_collapses_separators",
+    "tests/test_slug.py::test_max_length_does_not_end_with_hyphen",
+    "tests/test_slug.py::test_only_punctuation_gives_empty_slug",
+    "tests/test_slug.py::test_strips_edges",
+    "tests/test_wrap.py::test_long_word_kept_whole",
+    "tests/test_wrap.py::test_wrap",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

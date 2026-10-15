@@ -8,6 +8,14 @@ fail_to_pass = [
     "tests/test_hidden_ledger.py::test_hidden_no_binary_float_artifacts",
     "tests/test_hidden_ledger.py::test_hidden_invoice_total_uses_half_up",
 ]
+pass_to_pass = [
+    "tests/test_hidden_ledger.py::test_hidden_exact_cent_values_are_unchanged",
+    "tests/test_invoice.py::test_total_and_render",
+    "tests/test_money.py::test_format_cents",
+    "tests/test_money.py::test_split_evenly_distributes_remainder",
+    "tests/test_money.py::test_split_evenly_rejects_zero_ways",
+    "tests/test_money.py::test_to_cents_whole_and_simple",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

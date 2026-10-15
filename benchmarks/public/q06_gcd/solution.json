@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of gcd.",
+  "edits": [
+    {
+      "path": "algo/gcd.py",
+      "old": "        return gcd(a % b, b)\n",
+      "new": "        return gcd(b, a % b)\n"
+    }
+  ]
+}

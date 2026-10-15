@@ -35,12 +35,25 @@ class OllamaBackend:
     def model(self) -> str:
         return self._model
 
+    def unload(self) -> None:
+        """Ask the server to drop the model from memory now (keep_alive=0); best effort."""
+        try:
+            self._client.post(
+                f"{self._base_url}/api/generate", json={"model": self._model, "keep_alive": 0}
+            )
+        except httpx.HTTPError:
+            pass
+
     def complete(self, request: LLMRequest) -> LLMResponse:
         payload = {
             "model": self._model,
             "stream": False,
             "format": request.response_schema,
-            "options": {"temperature": 0, "seed": 0, "num_ctx": self._num_ctx},
+            "options": {
+                "temperature": 0 if request.sample_index == 0 else 0.7,
+                "seed": request.sample_index,
+                "num_ctx": self._num_ctx,
+            },
             "messages": [
                 {"role": "system", "content": request.system},
                 {"role": "user", "content": request.user},

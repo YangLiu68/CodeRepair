@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of is_valid_parenthesization.",
+  "edits": [
+    {
+      "path": "algo/is_valid_parenthesization.py",
+      "old": "    return True\n",
+      "new": "    return depth == 0\n"
+    }
+  ]
+}

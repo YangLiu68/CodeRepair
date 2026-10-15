@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of bucketsort.",
+  "edits": [
+    {
+      "path": "algo/bucketsort.py",
+      "old": "    for i, count in enumerate(arr):\n",
+      "new": "    for i, count in enumerate(counts):\n"
+    }
+  ]
+}

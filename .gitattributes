@@ -1,1 +1,2 @@
 benchmarks/tasks/** text eol=lf
+benchmarks/public/** text eol=lf

@@ -10,7 +10,8 @@ from coderepair.cli import colorize_diff, main
 def test_tasks(capsys):
     assert main(["tasks"]) == 0
     out = capsys.readouterr().out
-    assert out.count("\n") == 10 and "t10_deep_merge_injection" in out
+    assert out.count("\n") == 22  # 10 first-party fixtures + 12 public tasks
+    assert "t10_deep_merge_injection" in out and "q12_lcs_length" in out
 
 
 def test_propose_with_oracle_prints_banner_and_diff(capsys):
@@ -114,7 +115,7 @@ def test_unknown_task(capsys):
 
 def test_validate_single_fixture(capsys):
     assert main(["validate-fixtures", "t01_paginate_off_by_one"]) == 0
-    assert "1/1 fixtures valid" in capsys.readouterr().out
+    assert "1/1 tasks valid" in capsys.readouterr().out
 
 
 def test_colorize_diff():

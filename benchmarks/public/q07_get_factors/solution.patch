@@ -1,0 +1,12 @@
+diff --git a/algo/get_factors.py b/algo/get_factors.py
+--- a/algo/get_factors.py
++++ b/algo/get_factors.py
+@@ -7,7 +7,7 @@
+         if n % i == 0:
+             return [i] + get_factors(n // i)
+ 
+-    return []
++    return [n]
+ 
+ 
+ """

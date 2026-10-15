@@ -1,0 +1,26 @@
+id = "q02_bucketsort"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "failing test provided; observed vs expected outputs"
+fail_to_pass = [
+    "tests/test_bucketsort.py::test_bucketsort[case1]",
+    "tests/test_hidden_bucketsort.py::test_hidden_bucketsort[case2]",
+    "tests/test_hidden_bucketsort.py::test_hidden_bucketsort[case3]",
+    "tests/test_hidden_bucketsort.py::test_hidden_bucketsort[case4]",
+    "tests/test_hidden_bucketsort.py::test_hidden_bucketsort[case5]",
+    "tests/test_hidden_bucketsort.py::test_hidden_bucketsort[case6]",
+]
+pass_to_pass = [
+    "tests/test_bucketsort.py::test_bucketsort[case0]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/bucketsort.py"
+upstream_fixed = "correct_python_programs/bucketsort.py"
+upstream_cases = "json_testcases/bucketsort.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in bucketsort (one-line bug)"

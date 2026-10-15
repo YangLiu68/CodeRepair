@@ -7,6 +7,13 @@ fail_to_pass = [
     "tests/test_hidden_cachekit.py::test_hidden_keys_order_tracks_reads",
     "tests/test_hidden_cachekit.py::test_hidden_memoize_keeps_hot_entry",
 ]
+pass_to_pass = [
+    "tests/test_lru.py::test_capacity_evicts_oldest_insert",
+    "tests/test_lru.py::test_capacity_must_be_positive",
+    "tests/test_lru.py::test_contains_does_not_refresh_recency",
+    "tests/test_lru.py::test_hit_and_miss_counters",
+    "tests/test_lru.py::test_put_and_get",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

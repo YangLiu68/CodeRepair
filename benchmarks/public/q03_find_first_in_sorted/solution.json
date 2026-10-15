@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of find_first_in_sorted.",
+  "edits": [
+    {
+      "path": "algo/find_first_in_sorted.py",
+      "old": "    while lo <= hi:\n",
+      "new": "    while lo < hi:\n"
+    }
+  ]
+}

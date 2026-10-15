@@ -9,6 +9,13 @@ fail_to_pass = [
     "tests/test_hidden_confmerge.py::test_hidden_nested_override_not_aliased",
     "tests/test_hidden_confmerge.py::test_hidden_load_layers_nested",
 ]
+pass_to_pass = [
+    "tests/test_loader.py::test_later_layers_win",
+    "tests/test_loader.py::test_rejects_non_object",
+    "tests/test_merge.py::test_inputs_not_modified",
+    "tests/test_merge.py::test_merge_one_level",
+    "tests/test_merge.py::test_override_scalar",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

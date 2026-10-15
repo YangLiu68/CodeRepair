@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of bitcount.",
+  "edits": [
+    {
+      "path": "algo/bitcount.py",
+      "old": "        n ^= n - 1\n",
+      "new": "        n &= n - 1\n"
+    }
+  ]
+}

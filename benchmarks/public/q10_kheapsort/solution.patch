@@ -1,0 +1,12 @@
+diff --git a/algo/kheapsort.py b/algo/kheapsort.py
+--- a/algo/kheapsort.py
++++ b/algo/kheapsort.py
+@@ -4,7 +4,7 @@
+     heap = arr[:k]
+     heapq.heapify(heap)
+ 
+-    for x in arr:
++    for x in arr[k:]:
+         yield heapq.heappushpop(heap, x)
+ 
+     while heap:

@@ -17,6 +17,9 @@ class LLMRequest:
     system: str
     user: str
     response_schema: dict
+    #: 0 asks for the backend's most deterministic answer; n > 0 asks for an independent
+    #: sample (backends that support it use temperature > 0 with seed n).
+    sample_index: int = 0
 
 
 @dataclass

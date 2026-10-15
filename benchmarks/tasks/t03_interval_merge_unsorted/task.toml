@@ -7,6 +7,12 @@ fail_to_pass = [
     "tests/test_hidden_intervals.py::test_hidden_merge_returns_sorted_union",
     "tests/test_hidden_intervals.py::test_hidden_contains_after_unsorted_merge",
 ]
+pass_to_pass = [
+    "tests/test_ops.py::test_merge_overlapping_sorted_input",
+    "tests/test_ops.py::test_merge_shared_endpoint",
+    "tests/test_ops.py::test_total_covered_sorted_input",
+    "tests/test_ops.py::test_validate_rejects_reversed",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of kheapsort.",
+  "edits": [
+    {
+      "path": "algo/kheapsort.py",
+      "old": "    for x in arr:\n",
+      "new": "    for x in arr[k:]:\n"
+    }
+  ]
+}

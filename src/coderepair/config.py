@@ -44,6 +44,7 @@ class Settings:
     tasks_dir: Path
     runs_dir: Path
     allowed_roots: tuple[Path, ...]
+    public_tasks_dir: Path = PROJECT_ROOT / "benchmarks" / "public"
     backend: str = "oracle"
     anthropic_model: str = "claude-opus-5-5"
     anthropic_effort: str = "high"
@@ -53,17 +54,40 @@ class Settings:
     llm_timeout_s: int = 300
     fixture_test_timeout_s: int = 120
     limits: Limits = field(default_factory=Limits)
+    cache_dir: Path = PROJECT_ROOT / ".cache"
+    sandbox: str = "auto"
+    sandbox_image: str = "python:3.12-slim"
+    sandbox_timeout_s: int = 60
+    sandbox_memory_mb: int = 512
+
+    @property
+    def task_dirs(self) -> tuple[Path, ...]:
+        """Benchmark suites: first-party fixtures, then the public (QuixBugs) subset."""
+        return tuple(d for d in (self.tasks_dir, self.public_tasks_dir) if d.is_dir())
+
+    def sandbox_limits(self):
+        from .sandbox.base import SandboxLimits
+
+        return SandboxLimits(
+            wall_timeout_s=float(self.sandbox_timeout_s),
+            cpu_seconds=self.sandbox_timeout_s,
+            memory_mb=self.sandbox_memory_mb,
+        )
 
     @classmethod
     def from_env(cls) -> Settings:
         tasks_dir = _env_path("CODEREPAIR_TASKS_DIR", PROJECT_ROOT / "benchmarks" / "tasks")
+        public_dir = _env_path(
+            "CODEREPAIR_PUBLIC_TASKS_DIR", PROJECT_ROOT / "benchmarks" / "public"
+        )
         roots_env = os.environ.get("CODEREPAIR_ALLOWED_ROOTS", "").strip()
         if roots_env:
             allowed = tuple(Path(p).expanduser() for p in roots_env.split(os.pathsep) if p)
         else:
-            allowed = (tasks_dir,)
+            allowed = (tasks_dir, public_dir)
         return cls(
             tasks_dir=tasks_dir,
+            public_tasks_dir=public_dir,
             runs_dir=_env_path("CODEREPAIR_RUNS_DIR", PROJECT_ROOT / "runs"),
             allowed_roots=allowed,
             backend=os.environ.get("CODEREPAIR_BACKEND", "oracle").strip() or "oracle",
@@ -74,4 +98,10 @@ class Settings:
             ollama_model=os.environ.get("CODEREPAIR_OLLAMA_MODEL", "qwen2.5:7b"),
             llm_timeout_s=_env_int("CODEREPAIR_LLM_TIMEOUT_S", 300),
             fixture_test_timeout_s=_env_int("CODEREPAIR_FIXTURE_TEST_TIMEOUT_S", 120),
+            cache_dir=_env_path("CODEREPAIR_CACHE_DIR", PROJECT_ROOT / ".cache"),
+            sandbox=os.environ.get("CODEREPAIR_SANDBOX", "auto").strip() or "auto",
+            sandbox_image=os.environ.get("CODEREPAIR_SANDBOX_IMAGE", "python:3.12-slim").strip()
+            or "python:3.12-slim",
+            sandbox_timeout_s=_env_int("CODEREPAIR_SANDBOX_TIMEOUT_S", 60),
+            sandbox_memory_mb=_env_int("CODEREPAIR_SANDBOX_MEMORY_MB", 512),
         )

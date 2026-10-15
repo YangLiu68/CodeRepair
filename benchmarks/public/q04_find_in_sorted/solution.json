@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of find_in_sorted.",
+  "edits": [
+    {
+      "path": "algo/find_in_sorted.py",
+      "old": "            return binsearch(mid, end)\n",
+      "new": "            return binsearch(mid + 1, end)\n"
+    }
+  ]
+}

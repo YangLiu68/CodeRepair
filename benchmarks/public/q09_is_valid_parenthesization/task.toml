@@ -1,0 +1,22 @@
+id = "q09_is_valid_parenthesization"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "observed vs expected outputs only (issue-only)"
+fail_to_pass = [
+    "tests/test_hidden_is_valid_parenthesization.py::test_hidden_is_valid_parenthesization[case2]",
+]
+pass_to_pass = [
+    "tests/test_is_valid_parenthesization.py::test_is_valid_parenthesization[case0]",
+    "tests/test_is_valid_parenthesization.py::test_is_valid_parenthesization[case1]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/is_valid_parenthesization.py"
+upstream_fixed = "correct_python_programs/is_valid_parenthesization.py"
+upstream_cases = "json_testcases/is_valid_parenthesization.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in is_valid_parenthesization (one-line bug)"

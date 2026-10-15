@@ -13,8 +13,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import Limits
+from .execution import describe_result, run_repo_tests
 from .issue import ParsedIssue, parse_issue
-from .llm.base import BackendError, LLMBackend, LLMResponse
+from .llm.base import BackendError, LLMBackend, LLMRequest, LLMResponse
 from .patch import (
     PatchPolicy,
     PatchProposal,
@@ -26,6 +27,7 @@ from .patch import (
 from .prompting import PromptBundle, build_prompt
 from .repo import RepoSnapshot
 from .retrieval import RankedFile, rank_files
+from .sandbox.base import Sandbox, SandboxError, SandboxLimits, SandboxResult
 from .search import RepoIndex
 from .security import scan_for_injection
 from .trace import Trace, new_run_id
@@ -57,6 +59,8 @@ class ProposalRun:
     warnings: list[str] = field(default_factory=list)
     duration_s: float = 0.0
     run_dir: Path | None = None
+    #: Visible tests run on the patched copy in a sandbox (None if not requested or not run).
+    tests: SandboxResult | None = None
 
     @property
     def diff(self) -> str:
@@ -87,32 +91,41 @@ class ProposalRun:
             "duration_s": round(self.duration_s, 3),
             "snapshot_hash": self.snapshot_hash,
             "git_head": self.git_head,
+            "tests": _tests_summary(self.tests),
             "awaiting_human_review": self.status == STATUS_PROPOSED,
         }
 
 
-def propose_patch(
-    snapshot: RepoSnapshot,
-    issue_text: str,
-    backend: LLMBackend,
-    *,
-    limits: Limits | None = None,
-    policy: PatchPolicy | None = None,
-    runs_dir: Path | None = None,
-    task_id: str | None = None,
-) -> ProposalRun:
-    limits = limits or Limits()
-    policy = policy or PatchPolicy.from_limits(limits)
-    started = time.monotonic()
-    run_id = new_run_id(task_id or snapshot.root.name)
-    trace = Trace(run_id)
-    trace.add(
-        "start",
-        task_id=task_id,
-        backend=backend.name,
-        model=backend.model,
-        is_mock=backend.is_mock,
-    )
+def _tests_summary(result: SandboxResult | None) -> dict | None:
+    if result is None:
+        return None
+    return {
+        "sandbox": result.backend,
+        "isolation": result.isolation,
+        "counts": result.results.counts() if result.results else None,
+        "failing": [t for t, o in sorted(result.results.outcomes.items()) if o != "passed"]
+        if result.results
+        else [],
+        "limit_exceeded": result.limit_exceeded,
+        "problems": result.problems,
+        "duration_s": round(result.duration_s, 3),
+    }
+
+
+@dataclass
+class RepairContext:
+    """Everything derived from the issue and the snapshot before the first model call."""
+
+    issue: ParsedIssue
+    index: RepoIndex
+    ranked: list[RankedFile]
+    bundle: PromptBundle
+    warnings: list[str]
+
+
+def build_context(
+    snapshot: RepoSnapshot, issue_text: str, limits: Limits, trace: Trace
+) -> RepairContext:
     trace.add(
         "ingest",
         root=str(snapshot.root),
@@ -121,7 +134,6 @@ def propose_patch(
         files=snapshot.paths(),
         excluded=[vars(e) for e in snapshot.excluded],
     )
-
     issue = parse_issue(issue_text)
     trace.add("issue_parsed", issue=issue.to_dict())
 
@@ -138,7 +150,113 @@ def propose_patch(
     trace.add(
         "prompt_built", **bundle.to_dict(), system=bundle.request.system, user=bundle.request.user
     )
+    warnings = [
+        f"possible prompt injection in {finding.source} line {finding.line} "
+        f"({finding.rule}, {finding.severity}): {finding.excerpt!r}"
+        for finding in bundle.injection_findings
+    ]
+    warnings += [
+        f"redacted {redaction['count']} {redaction['kind']} secret(s) "
+        f"from {redaction['source']} before sending"
+        for redaction in bundle.redactions
+    ]
+    return RepairContext(issue, index, ranked, bundle, warnings)
 
+
+@dataclass
+class AttemptResult:
+    """One model call and the static validation of what it returned."""
+
+    status: str
+    response: LLMResponse | None = None
+    proposal: PatchProposal | None = None
+    patch: PatchResult | None = None
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    backend_error: BackendError | None = None
+
+
+def attempt_proposal(
+    request: LLMRequest,
+    backend: LLMBackend,
+    snapshot: RepoSnapshot,
+    policy: PatchPolicy,
+    trace: Trace,
+) -> AttemptResult:
+    try:
+        response = backend.complete(request)
+    except BackendError as exc:
+        trace.add("llm_error", error=str(exc), retryable=exc.retryable)
+        return AttemptResult(
+            STATUS_BACKEND_ERROR, errors=[f"backend error: {exc}"], backend_error=exc
+        )
+    trace.add(
+        "llm_response",
+        model=response.model,
+        text=response.text,
+        input_tokens=response.input_tokens,
+        output_tokens=response.output_tokens,
+        usage_is_estimate=response.usage_is_estimate,
+        latency_s=round(response.latency_s, 3),
+        stop_reason=response.stop_reason,
+        request_id=response.request_id,
+        metadata=response.metadata,
+    )
+    attempt = AttemptResult(STATUS_PARSE_ERROR, response=response)
+    try:
+        proposal = parse_proposal(response.text)
+    except ProposalParseError as exc:
+        attempt.errors.append(f"could not parse proposal: {exc}")
+        trace.add("parse_error", error=str(exc))
+        return attempt
+    attempt.proposal = proposal
+    trace.add("proposal_parsed", proposal=proposal.model_dump())
+    if not proposal.edits:
+        attempt.status = STATUS_NO_EDITS
+        attempt.errors.append("model proposed no edits")
+        return attempt
+    result = apply_proposal(snapshot, proposal, policy)
+    attempt.patch = result
+    trace.add("patch_validated", **result.to_dict(), diff=result.diff)
+    attempt.warnings.extend(result.warnings)
+    if result.ok:
+        attempt.status = STATUS_PROPOSED
+    else:
+        attempt.status = STATUS_REJECTED
+        attempt.errors.extend(result.errors)
+    return attempt
+
+
+def propose_patch(
+    snapshot: RepoSnapshot,
+    issue_text: str,
+    backend: LLMBackend,
+    *,
+    limits: Limits | None = None,
+    policy: PatchPolicy | None = None,
+    runs_dir: Path | None = None,
+    task_id: str | None = None,
+    sandbox: Sandbox | None = None,
+    sandbox_limits: SandboxLimits | None = None,
+) -> ProposalRun:
+    """Propose a patch for ``issue_text`` with a single model call.
+
+    With ``sandbox``, also run the repository's visible tests on a patched
+    throwaway copy (the repository itself is never changed).
+    """
+    limits = limits or Limits()
+    policy = policy or PatchPolicy.from_limits(limits)
+    started = time.monotonic()
+    run_id = new_run_id(task_id or snapshot.root.name)
+    trace = Trace(run_id)
+    trace.add(
+        "start",
+        task_id=task_id,
+        backend=backend.name,
+        model=backend.model,
+        is_mock=backend.is_mock,
+    )
+    context = build_context(snapshot, issue_text, limits, trace)
     run = ProposalRun(
         run_id=run_id,
         task_id=task_id,
@@ -146,43 +264,22 @@ def propose_patch(
         model=backend.model,
         is_mock=backend.is_mock,
         status=STATUS_BACKEND_ERROR,
-        issue=issue,
-        retrieval=ranked,
-        prompt=bundle,
+        issue=context.issue,
+        retrieval=context.ranked,
+        prompt=context.bundle,
         snapshot_hash=snapshot.content_hash,
         git_head=snapshot.git_head,
+        warnings=list(context.warnings),
     )
-    for finding in bundle.injection_findings:
-        run.warnings.append(
-            f"possible prompt injection in {finding.source} line {finding.line} "
-            f"({finding.rule}, {finding.severity}): {finding.excerpt!r}"
-        )
-    for redaction in bundle.redactions:
-        run.warnings.append(
-            f"redacted {redaction['count']} {redaction['kind']} secret(s) "
-            f"from {redaction['source']} before sending"
-        )
-
-    try:
-        response = backend.complete(bundle.request)
-    except BackendError as exc:
-        run.errors.append(f"backend error: {exc}")
-        trace.add("llm_error", error=str(exc), retryable=exc.retryable)
-    else:
-        run.response = response
-        trace.add(
-            "llm_response",
-            model=response.model,
-            text=response.text,
-            input_tokens=response.input_tokens,
-            output_tokens=response.output_tokens,
-            usage_is_estimate=response.usage_is_estimate,
-            latency_s=round(response.latency_s, 3),
-            stop_reason=response.stop_reason,
-            request_id=response.request_id,
-            metadata=response.metadata,
-        )
-        _evaluate_response(run, snapshot, response.text, policy, trace)
+    attempt = attempt_proposal(context.bundle.request, backend, snapshot, policy, trace)
+    run.status = attempt.status
+    run.response = attempt.response
+    run.proposal = attempt.proposal
+    run.patch = attempt.patch
+    run.errors.extend(attempt.errors)
+    run.warnings.extend(attempt.warnings)
+    if sandbox is not None and run.status == STATUS_PROPOSED and run.patch is not None:
+        _run_visible_tests(run, snapshot, sandbox, sandbox_limits, trace)
 
     run.duration_s = time.monotonic() - started
     trace.add("result", **run.summary_dict())
@@ -191,31 +288,22 @@ def propose_patch(
     return run
 
 
-def _evaluate_response(
-    run: ProposalRun, snapshot: RepoSnapshot, text: str, policy: PatchPolicy, trace: Trace
+def _run_visible_tests(
+    run: ProposalRun,
+    snapshot: RepoSnapshot,
+    sandbox: Sandbox,
+    limits: SandboxLimits | None,
+    trace: Trace,
 ) -> None:
+    trace.add("sandbox_start", sandbox=sandbox.name, isolation=sandbox.isolation)
     try:
-        proposal = parse_proposal(text)
-    except ProposalParseError as exc:
-        run.status = STATUS_PARSE_ERROR
-        run.errors.append(f"could not parse proposal: {exc}")
-        trace.add("parse_error", error=str(exc))
+        result = run_repo_tests(snapshot, sandbox, overlay=run.patch.changed_files, limits=limits)
+    except SandboxError as exc:
+        run.warnings.append(f"tests not run: {exc}")
+        trace.add("sandbox_error", error=str(exc))
         return
-    run.proposal = proposal
-    trace.add("proposal_parsed", proposal=proposal.model_dump())
-    if not proposal.edits:
-        run.status = STATUS_NO_EDITS
-        run.errors.append("model proposed no edits")
-        return
-    result = apply_proposal(snapshot, proposal, policy)
-    run.patch = result
-    trace.add("patch_validated", **result.to_dict(), diff=result.diff)
-    run.warnings.extend(result.warnings)
-    if result.ok:
-        run.status = STATUS_PROPOSED
-    else:
-        run.status = STATUS_REJECTED
-        run.errors.extend(result.errors)
+    run.tests = result
+    trace.add("sandbox_tests", **result.to_dict(), summary=describe_result(result))
 
 
 def _write_artifacts(run: ProposalRun, trace: Trace, runs_dir: Path) -> Path:

@@ -4,7 +4,8 @@ Task layout (``benchmarks/tasks/<id>/``)::
 
     issue.md        agent-visible issue text
     repo/           agent-visible buggy repository (the only directory the agent can read)
-    task.toml       harness-only metadata: category, fail-to-pass tests, provenance
+    task.toml       harness-only metadata: category, fail-to-pass and pass-to-pass
+                    test ids, provenance
     solution.json   harness-only gold edits (same schema as an agent proposal)
     solution.patch  harness-only unified diff rendered from solution.json
     hidden_tests/   harness-only held-out tests, copied into repo/tests/ at evaluation time
@@ -21,7 +22,8 @@ from pathlib import Path
 
 from ..patch import PatchProposal
 
-TASK_ID_RE = re.compile(r"^t\d{2}_[a-z0-9_]+$")
+# t01_... first-party fixtures, q01_... the public (QuixBugs-derived) suite
+TASK_ID_RE = re.compile(r"^[tq]\d{2}_[a-z0-9_]+$")
 
 
 class TaskError(ValueError):
@@ -36,6 +38,7 @@ class TaskSpec:
     difficulty: str
     issue_style: str
     fail_to_pass: tuple[str, ...]
+    pass_to_pass: tuple[str, ...]
     adversarial: tuple[str, ...]
     provenance: dict
 
@@ -76,6 +79,17 @@ class TaskSpec:
     def hidden_test_files(self) -> list[Path]:
         return sorted(self.hidden_tests_dir.glob("test_hidden_*.py"))
 
+    def hidden_test_overlay(self) -> dict[str, str]:
+        """Harness-only: hidden tests keyed by the path they take in the evaluated repo."""
+        return {
+            f"tests/{path.name}": path.read_text(encoding="utf-8")
+            for path in self.hidden_test_files()
+        }
+
+    @property
+    def expected_tests(self) -> frozenset[str]:
+        return frozenset(self.fail_to_pass) | frozenset(self.pass_to_pass)
+
     def summary(self) -> dict:
         return {
             "id": self.id,
@@ -97,7 +111,14 @@ def _load(task_dir: Path) -> TaskSpec:
         raise TaskError(
             f"{task_dir.name}: task.toml id {meta.get('id')!r} does not match directory"
         )
-    for key in ("category", "difficulty", "issue_style", "fail_to_pass", "provenance"):
+    for key in (
+        "category",
+        "difficulty",
+        "issue_style",
+        "fail_to_pass",
+        "pass_to_pass",
+        "provenance",
+    ):
         if key not in meta:
             raise TaskError(f"{task_dir.name}: task.toml is missing {key!r}")
     return TaskSpec(
@@ -107,6 +128,7 @@ def _load(task_dir: Path) -> TaskSpec:
         difficulty=meta["difficulty"],
         issue_style=meta["issue_style"],
         fail_to_pass=tuple(meta["fail_to_pass"]),
+        pass_to_pass=tuple(meta["pass_to_pass"]),
         adversarial=tuple(meta.get("adversarial", ())),
         provenance=dict(meta["provenance"]),
     )
@@ -118,6 +140,16 @@ def list_tasks(tasks_dir: Path) -> list[TaskSpec]:
     return [
         _load(d) for d in sorted(tasks_dir.iterdir()) if d.is_dir() and TASK_ID_RE.match(d.name)
     ]
+
+
+def load_any_task(task_dirs: tuple[Path, ...], task_id: str) -> TaskSpec:
+    """Find ``task_id`` in any of the benchmark suites."""
+    if not TASK_ID_RE.match(task_id):
+        raise TaskError(f"invalid task id {task_id!r}")
+    for tasks_dir in task_dirs:
+        if (tasks_dir / task_id).is_dir():
+            return _load(tasks_dir / task_id)
+    raise TaskError(f"unknown task {task_id!r}")
 
 
 def load_task(tasks_dir: Path, task_id: str) -> TaskSpec:

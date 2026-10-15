@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of hanoi.",
+  "edits": [
+    {
+      "path": "algo/hanoi.py",
+      "old": "        steps.append((start, helper))\n",
+      "new": "        steps.append((start, end))\n"
+    }
+  ]
+}

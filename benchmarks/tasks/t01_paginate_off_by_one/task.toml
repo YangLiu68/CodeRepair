@@ -7,6 +7,12 @@ fail_to_pass = [
     "tests/test_hidden_pager.py::test_hidden_last_page_is_partial",
     "tests/test_hidden_pager.py::test_hidden_per_page_one_walks_every_item",
 ]
+pass_to_pass = [
+    "tests/test_core.py::test_out_of_range_page_rejected",
+    "tests/test_core.py::test_total_pages_empty_is_one",
+    "tests/test_core.py::test_total_pages_rejects_non_positive",
+    "tests/test_core.py::test_total_pages_rounds_up",
+]
 
 [provenance]
 origin = "original work written for CodeRepair"

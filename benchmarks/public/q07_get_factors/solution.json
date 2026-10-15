@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of get_factors.",
+  "edits": [
+    {
+      "path": "algo/get_factors.py",
+      "old": "\n    return []\n",
+      "new": "\n    return [n]\n"
+    }
+  ]
+}
