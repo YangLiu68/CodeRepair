@@ -1,5 +1,31 @@
 # Progress log
 
+## 2026-10-15 — Milestone 5: comparative benchmark run
+
+**What ran:** `coderepair bench --suite all --backend ollama` with `qwen2.5:3b` (the shared
+machine's resource manager asks for models of 3B or less), 22 tasks × 3 agents = 66 rows, at most
+3 model calls per agent per task, Seatbelt sandbox. Paused once at the resource manager's request
+(SIGINT to the benchmark's own process, model unloaded) and resumed from the JSONL; 53 + 13 rows,
+one configuration fingerprint. About 35 minutes of compute, 34 of them waiting on the model.
+
+| Agent | Resolved | pass@1 | Valid patch | Tokens |
+|---|---|---|---|---|
+| direct | 1/22 | 0/22 | 11/22 | 72k |
+| retrieval | 3/22 | 2/22 | 14/22 | 72k |
+| feedback | 3/22 | 2/22 | 17/22 | 98k |
+
+Findings, stated with their limits in BENCHMARK.md: the 3B model resolves at most 3/22 with any
+agent, so the run cannot rank retrieval against feedback; retrieval context and the loop's anchor
+hints cut anchor-mismatch failures from 8 to 6 to 2 and raise valid patches from 11 to 17, but the
+extra patches were mostly wrong fixes; feedback costs about 36% more tokens.
+
+**Files:** `docs/results/m5_ollama_qwen2.5-3b.{jsonl,summary.json,md}`, BENCHMARK.md, README.md,
+dashboard screenshots in `docs/images/`.
+
+**Next steps (not done):** run the same harness with a stronger model (`--backend anthropic` needs
+an API key) and several seeds; install Docker or Colima so the container backend is exercised
+locally; push to a remote so CI runs; choose a project license.
+
 ## 2026-10-15 — Milestones 2–4, 6 and 7
 
 **Scope delivered:** sandboxed test execution (Docker backend + macOS Seatbelt fallback) with 15

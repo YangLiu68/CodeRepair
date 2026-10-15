@@ -322,7 +322,7 @@ async function loadBenchmarks() {
       Object.entries(s.failures || {}).map(([k, v]) => `${k} ${v}`).join(", "),
     ]);
     box.appendChild(table(["Agent", "Resolved", "pass@1", "Valid patch", "Regressions",
-      "Calls", "Tokens", "Median wall", "Failures"], rows));
+      "Mean calls", "Mean tokens", "Median wall", "Failures"], rows));
     const more = el("button", "link", "Per-task results");
     more.addEventListener("click", async () => {
       const data = await api(`/api/benchmarks/${encodeURIComponent(result.name)}`);

@@ -48,7 +48,7 @@ issue + repo ─► retrieval with reasons ─► model ─► validated edits �
 | M2 disposable, network-less test sandbox with abuse probes | done (Docker backend verified by command-line tests locally; runs for real in CI) |
 | M3 iterative repair loop | done |
 | M4 candidates, reproduction tests, lint/type/security checks, human approval | done |
-| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done, one local model (see below) |
+| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done, one local 3B model (see below) |
 | M6 licensed public subset (QuixBugs) with leakage controls | done |
 | M7 dashboard, CI, threat model, docs, demo | done (CI has not run: no remote yet) |
 
@@ -74,6 +74,10 @@ uv run pytest -rs
 
 The walkthrough with real output is in [docs/DEMO.md](docs/DEMO.md).
 
+| Run detail: reproduction test, ranked candidates, diffs | Task view: issue and retrieval with reasons |
+|---|---|
+| ![Repair run in the dashboard](docs/images/dashboard-run.png) | ![Task view in the dashboard](docs/images/dashboard-task.png) |
+
 ## Backends
 
 | Backend | What it is | Use |
@@ -87,7 +91,19 @@ Configuration is environment-only; see [.env.example](.env.example).
 
 ## Measured
 
-BENCHMARK_SUMMARY_PLACEHOLDER
+Comparative benchmark (M5), local `qwen2.5:3b`, 22 tasks, at most 3 model calls per agent per task,
+hidden tests scored in the sandbox:
+
+| Agent | Resolved | Statically valid patch | Anchor-mismatch failures | Tokens |
+|---|---|---|---|---|
+| direct (no retrieval, no tests) | 1/22 | 11/22 | 8 | 72k |
+| retrieval (ranked context, no tests) | 3/22 | 14/22 | 6 | 72k |
+| feedback (retrieval + sandboxed test loop) | 3/22 | 17/22 | 2 | 98k |
+
+A 3B model is too weak for these tasks, and with 22 tasks and one run, one or two tasks of difference
+is noise: this run does **not** show that test feedback resolves more issues. It does show where each
+agent fails: retrieval and the loop's anchor hints turn most format failures into valid patches,
+which the small model then gets wrong. Details, per-task results and caveats: [BENCHMARK.md](BENCHMARK.md).
 
 Other measurements: retrieval recall@1 0.90 / recall@3 1.00 on the fixtures (random: 0.26 / 0.77;
 the repos have 3–5 source files, so this mostly shows the plumbing works); all 22 tasks validate in

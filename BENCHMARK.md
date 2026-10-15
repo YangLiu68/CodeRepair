@@ -123,7 +123,59 @@ deterministic call, a built-in consistency check). Failure categories: `anchor-m
 
 ### Results
 
-M5_RESULTS_PLACEHOLDER
+**Run:** `qwen2.5:3b` through Ollama on an Apple M4 (16 GB, shared with other jobs), Seatbelt
+sandbox, all 22 tasks × 3 agents = 66 rows, 2026-10-15. The run was paused once at the machine's
+resource manager's request and resumed from its JSONL (53 rows, then 13; same configuration
+fingerprint). Raw rows: `docs/results/m5_ollama_qwen2.5-3b.jsonl`; summary and table next to it.
+Reproduce with `CODEREPAIR_OLLAMA_MODEL=qwen2.5:3b uv run coderepair bench --suite all --backend
+ollama --out <file>.jsonl`.
+
+| Agent | Resolved | pass@1 | Statically valid patch | Rows with a broken pass-to-pass test | Mean calls | Tokens (all tasks) | Median wall s / task |
+|---|---|---|---|---|---|---|---|
+| direct | **1/22** | 0/22 | 11/22 | 4 | 2.36 | 72k | 30.0 |
+| retrieval | **3/22** | 2/22 | 14/22 | 5 | 2.23 | 72k | 30.6 |
+| feedback | **3/22** | 2/22 | 17/22 | 7 | 2.59 | 98k | 32.5 |
+
+| Suite | direct | retrieval | feedback |
+|---|---|---|---|
+| fixtures (10) | 0 | 1 | 1 |
+| public (12) | 1 | 2 | 2 |
+
+Failure categories (66 rows):
+
+| Category | direct | retrieval | feedback |
+|---|---|---|---|
+| anchor-mismatch (no valid patch) | 8 | 6 | 2 |
+| syntax-error (no valid patch) | 1 | 2 | 0 |
+| other invalid output / no edits | 2 | 0 | 3 |
+| wrong-fix (valid patch, fail-to-pass still failing) | 9 | 11 | 13 |
+| regression (fail-to-pass fixed, pass-to-pass broken) | 1 | 0 | 1 |
+
+Per task (`docs/results/m5_ollama_qwen2.5-3b.md` has the full matrix): all three agents resolve
+`q01_bitcount`; retrieval and feedback resolve `t01_paginate_off_by_one`; retrieval alone resolves
+`q06_gcd` (with its second, temperature-0.7 sample); feedback alone resolves
+`q03_find_first_in_sorted` (after test feedback).
+
+**What this shows, and what it does not:**
+
+- A 3B local model is far too weak for these tasks: at most 3 of 22 resolved by any agent. With 22
+  tasks and one run, a difference of one or two tasks is noise, so **this run does not establish
+  that test feedback resolves more issues than retrieval alone**; it resolves the same number.
+- What the harness *does* measure clearly is where each agent fails. Retrieval context and the
+  feedback loop mostly fix **format** failures: statically valid patches rise from 11 (direct) to
+  14 (retrieval) to 17 (feedback), and anchor-mismatch failures fall from 8 to 6 to 2, which is what
+  the loop's "closest real lines" hints target. The extra valid patches were mostly wrong fixes
+  (wrong-fix 9 → 11 → 13): the small model could not get from a failing test to the right fix within
+  three calls.
+- The feedback agent cost about 36% more tokens (98k vs 72k) for the same resolution, and broke a
+  previously passing test in more rows (7 vs 5), because it submits a valid patch more often.
+- `pass@1` is identical for retrieval and feedback (2/22), as it must be: their first call is the
+  same deterministic request. This is a built-in consistency check of the harness.
+- No sign of a memorisation advantage on the public subset at this model size (2/12 vs 1/10).
+- The loop's attempts all use temperature 0 with a changed prompt, while the sampling agents' later
+  samples use temperature 0.7. On `q06_gcd` diversity won; on `q03` feedback won. A larger run (more
+  tasks, several seeds, a stronger model such as Claude via `--backend anthropic`) is needed to rank
+  the agents; the harness supports it unchanged.
 
 ## Milestone 1 smoke run (historical, patches not executed)
 

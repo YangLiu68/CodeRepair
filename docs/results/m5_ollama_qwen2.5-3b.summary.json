@@ -1,0 +1,121 @@
+{
+  "meta": {
+    "kind": "comparative benchmark",
+    "backend": "ollama",
+    "model": "qwen2.5:3b",
+    "is_mock": false,
+    "budget": {
+      "max_calls": 3,
+      "max_tokens": 60000,
+      "max_wall_s": 900.0
+    },
+    "agents": [
+      "direct",
+      "retrieval",
+      "feedback"
+    ],
+    "sandbox": "seatbelt",
+    "sandbox_limits": {
+      "wall_timeout_s": 60.0,
+      "cpu_seconds": 60,
+      "memory_mb": 512,
+      "tmp_mb": 64,
+      "disk_write_mb": 256,
+      "max_file_mb": 32,
+      "max_open_files": 256,
+      "max_processes": 64,
+      "output_bytes": 65536,
+      "output_hard_cap_bytes": 8000000
+    },
+    "date": "2026-10-15T13:43:04+00:00",
+    "machine": "Darwin arm64 / Python 3.12.10"
+  },
+  "config": "c4d19a57f67b",
+  "summary": {
+    "direct": {
+      "tasks": 22,
+      "resolved": 1,
+      "resolve_rate": 0.045,
+      "pass_at_1": 0,
+      "valid_patch": 11,
+      "regressions": 4,
+      "mean_calls": 2.36,
+      "mean_tokens": 3280,
+      "median_llm_latency_s": 30.0,
+      "median_wall_s": 30.0,
+      "failures": {
+        "wrong-fix": 9,
+        "anchor-mismatch": 8,
+        "regression": 1,
+        "invalid-patch": 2,
+        "syntax-error": 1
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 0
+        },
+        "public": {
+          "tasks": 12,
+          "resolved": 1
+        }
+      }
+    },
+    "retrieval": {
+      "tasks": 22,
+      "resolved": 3,
+      "resolve_rate": 0.136,
+      "pass_at_1": 2,
+      "valid_patch": 14,
+      "regressions": 5,
+      "mean_calls": 2.23,
+      "mean_tokens": 3272,
+      "median_llm_latency_s": 30.2,
+      "median_wall_s": 30.6,
+      "failures": {
+        "wrong-fix": 11,
+        "anchor-mismatch": 6,
+        "syntax-error": 2
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 1
+        },
+        "public": {
+          "tasks": 12,
+          "resolved": 2
+        }
+      }
+    },
+    "feedback": {
+      "tasks": 22,
+      "resolved": 3,
+      "resolve_rate": 0.136,
+      "pass_at_1": 2,
+      "valid_patch": 17,
+      "regressions": 7,
+      "mean_calls": 2.59,
+      "mean_tokens": 4470,
+      "median_llm_latency_s": 30.6,
+      "median_wall_s": 32.5,
+      "failures": {
+        "wrong-fix": 13,
+        "regression": 1,
+        "invalid-patch": 2,
+        "anchor-mismatch": 2,
+        "no-edits": 1
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 1
+        },
+        "public": {
+          "tasks": 12,
+          "resolved": 2
+        }
+      }
+    }
+  }
+}
