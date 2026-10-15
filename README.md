@@ -1,89 +1,131 @@
 # CodeRepair
 
-A constrained coding agent for small Python repositories. It reads an authorized issue,
-finds the relevant files, proposes a minimal patch, and hands a human a reviewable diff.
-Later milestones add sandboxed test execution, an iterative repair loop, and a
-comparative benchmark. It never merges or pushes.
+A constrained coding agent for small Python repositories. It reads an authorized issue, finds the
+relevant files, proposes a minimal patch, **tests it in a sandbox**, iterates on the failures, ranks
+the candidates, and hands a human a reviewable diff. It never merges, pushes or runs `git`, and
+nothing reaches a repository without an explicit approval.
 
 **Focus:** verifiable, test-driven repair with strong isolation and transparent evaluation.
+
+```
+issue + repo ─► retrieval with reasons ─► model ─► validated edits ─► sandboxed tests ─┐
+                                            ▲                                          │
+                                            └──── escaped, redacted feedback ◄─────────┘
+                          ranked candidates (tests, reproduction test, lint/types, security review)
+                                   ─► human review ─► approve ─► apply (no git, no push)
+```
+
+## Highlights
+
+- **Two sandbox backends, one contract.** Docker (`--network none`, non-root, read-only rootfs and
+  workspace, tmpfs, CPU/memory/pids limits, no capabilities) and a macOS Seatbelt fallback
+  (deny-by-default profile, rlimits, memory and disk watchdogs). Pytest comes from a
+  content-addressed, read-only runner bundle, so the image is stock CPython and nothing is downloaded
+  at test time. 15 hostile probe suites (exfiltration, fork bombs, memory/disk/output floods, reading
+  other processes' environments, forged results…) are contained, and negative controls prove the
+  probes would notice an escape.
+- **Untrusted results stay untrusted.** Results files are size-capped, nonce-checked,
+  FIFO/symlink-safe and must agree with the exit status; missing tests count as failures; "fixed"
+  requires the previously failing tests to pass, not to disappear.
+- **A repair loop that learns from the harness, not from the repo.** Baseline → targeted tests →
+  full suite → feedback (anchor hints from the real file, escaped and redacted test output) under
+  attempt, token and time budgets.
+- **Ranking you can read.** Candidates are scored on visible tests, regressions, a model-written
+  *reproduction test* that must fail on the original code, newly introduced lint and type errors
+  (ruff/mypy on throwaway copies, never importing the code), and an AST security review of the diff.
+- **A real approval gate.** Approvals record reviewer, time and diff hash; `apply` re-verifies the
+  repository byte-for-byte and writes files without git. A patch that passes every hidden test but
+  adds `os.system("curl … | sh")` is stopped (see the demo).
+- **Honest evaluation.** 10 first-party seeded-bug tasks plus 12 tasks derived from QuixBugs (MIT),
+  hidden tests, leakage checks on every prompt, and a comparative benchmark of three agents under
+  equal budgets.
 
 ## Status
 
 | Milestone | State |
 |---|---|
-| M1: fixtures, ingestion, issue parsing, read-only search, patch proposal, diff display | **done** (see [PROGRESS.md](PROGRESS.md)) |
-| M2: disposable, network-less test sandbox | blocked: no container runtime installed on the dev machine |
-| M3–M7: repair loop, ranking and approval gate, benchmark, public subset, dashboard | not started |
+| M1 fixtures, ingestion, issue parsing, read-only search, patch proposal, diff display | done |
+| M2 disposable, network-less test sandbox with abuse probes | done (Docker backend verified by command-line tests locally; runs for real in CI) |
+| M3 iterative repair loop | done |
+| M4 candidates, reproduction tests, lint/type/security checks, human approval | done |
+| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done, one local model (see below) |
+| M6 licensed public subset (QuixBugs) with leakage controls | done |
+| M7 dashboard, CI, threat model, docs, demo | done (CI has not run: no remote yet) |
 
-What M1 does **not** do yet: run tests on proposed patches, retry, or write anything back.
-A "proposed" patch has passed static validation only.
+Progress log with test results per milestone: [PROGRESS.md](PROGRESS.md).
 
 ## Quickstart
 
-Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/).
+Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/). Test execution needs Docker (with
+`python:3.12-slim` pulled) or macOS; without either, CodeRepair refuses to run repository code.
 
 ```bash
-uv sync --all-extras                      # install (locked)
-uv run coderepair tasks                   # the 10 seeded-bug benchmark tasks
-uv run coderepair show t06_coupon_threshold_multifile
-uv run coderepair retrieve t06_coupon_threshold_multifile    # ranked files + reasons
-uv run coderepair propose t10_deep_merge_injection           # default: oracle mock backend
-uv run coderepair propose t10_deep_merge_injection \
-    --backend scripted --script docs/demo/malicious_response.json   # rejected
-uv run coderepair validate-fixtures       # runs the fixtures' own tests (first-party only)
-uv run coderepair eval-retrieval          # recall@k against gold files
-uv run coderepair serve                   # local API + diff viewer on http://127.0.0.1:8000
-uv run pytest                             # 190+ tests
+uv sync --all-extras
+uv run coderepair sandbox status && uv run coderepair sandbox selftest
+uv run coderepair tasks                                   # 10 fixtures + 12 public tasks
+uv run coderepair repair t01_paginate_off_by_one --evaluate          # oracle mock by default
+uv run coderepair repair t02_mutable_default_tags --backend scripted \
+    --script docs/demo/repro_t02.json --candidates 2 --repro-test   # reproduction-test ranking
+uv run coderepair review <run-id> && uv run coderepair approve <run-id> --reviewer you
+uv run coderepair bench --backend oracle --tasks t01_paginate_off_by_one q06_gcd
+uv run coderepair serve                                   # dashboard on http://127.0.0.1:8000
+uv run pytest -rs
 ```
 
-The full walkthrough is in [docs/DEMO.md](docs/DEMO.md).
+The walkthrough with real output is in [docs/DEMO.md](docs/DEMO.md).
 
 ## Backends
 
 | Backend | What it is | Use |
 |---|---|---|
-| `oracle` | **Mock.** Replays the task's gold solution | Pipeline check without a key. Never a repair result |
+| `oracle` | **Mock.** Replays the task's gold solution | Pipeline checks. Never a repair result |
 | `scripted` | **Mock.** Replays canned responses from a JSON file | Tests and adversarial demos |
-| `anthropic` | Claude via the official SDK (default `claude-opus-5-5`), structured JSON output, server-side refusal fallback on | Real runs. Needs `ANTHROPIC_API_KEY` or an `ant auth login` profile |
-| `ollama` | Local model via Ollama (default `qwen2.5:7b`), JSON-schema output | Offline real runs; nothing leaves the machine |
+| `anthropic` | Claude via the official SDK (default `claude-opus-5-5`), structured JSON output | Needs `ANTHROPIC_API_KEY` or an `ant auth login` profile. Not run live here (no key) |
+| `ollama` | Local model via Ollama, JSON-schema output; `sample_index` > 0 samples at temperature 0.7 | Offline real runs; nothing leaves the machine |
 
 Configuration is environment-only; see [.env.example](.env.example).
 
-## Measured so far
+## Measured
 
-- Fixture validation: 10/10 tasks valid (bug reproduces, gold patch fixes it, hidden tests catch it).
-- Retrieval on the 10 tasks: recall@1 = 0.90, recall@3 = 1.00, MRR = 0.95 (random baseline recall@1 = 0.26).
-  These repositories are tiny (3–5 non-test files), so this mainly shows the plumbing works.
-- One local smoke run with `qwen2.5:7b`: 6/10 proposals passed static validation, 1/10 matched the gold diff.
-  The patches were not executed, so this is not a repair rate. See [BENCHMARK.md](BENCHMARK.md).
+BENCHMARK_SUMMARY_PLACEHOLDER
 
-## Security posture (M1)
+Other measurements: retrieval recall@1 0.90 / recall@3 1.00 on the fixtures (random: 0.26 / 0.77;
+the repos have 3–5 source files, so this mostly shows the plumbing works); all 22 tasks validate in
+the sandbox; gold patches resolve and buggy repos fail for every task.
 
-- Repositories are read into an in-memory snapshot. Only allowed roots are accepted, `$HOME` and credential
-  directories are denied, and symlinks, binaries, oversized and credential-like files are skipped.
-- No repository code, `git` command or model output is ever executed by the agent pipeline.
-- Model output is parsed as data: exact search/replace edits, validated against a path policy. Tests, CI,
-  build files and sensitive files are protected. Every patch is all-or-nothing and syntax-checked.
-- Prompts fence repository and issue text as untrusted, escape closing tags, redact likely secrets, and flag
-  prompt-injection text.
-- The local API binds to loopback, checks the `Host` header, sends a strict CSP and renders all text with
-  `textContent`.
+## Security posture
 
-Details and residual risks: [ARCHITECTURE.md](ARCHITECTURE.md).
+- Repository code, model-written patches and model-written tests run **only** inside the sandbox.
+  The single exception is validating the first-party fixtures, which may run on the host on a temp
+  copy with a scrubbed environment.
+- Repositories are read into an in-memory snapshot (allowed roots, `$HOME` and credential directories
+  denied, no symlinks, secrets skipped before reading). `git` is never run on them.
+- Model output is parsed as data: exact search/replace edits under a path policy (tests, CI, build
+  and conftest files protected, no new files), all-or-nothing, syntax-checked.
+- Everything untrusted that goes back into a prompt (issue, files, test ids, test output) is fenced,
+  tag-escaped, redacted and scanned for injection.
+- The dashboard binds to loopback, checks `Host` and `Origin`, accepts only JSON for state changes,
+  sends a strict CSP and renders text with `textContent`.
+
+Threat model (19 threats, residual risks included): [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Layout
 
 ```
-src/coderepair/        library, CLI (cli.py) and API (api.py)
-  repo.py              read-only ingestion          security.py   path policy, redaction, injection scan
-  issue.py             issue parsing                search.py     grep, symbols, imports, BM25
-  retrieval.py         ranking with reasons         prompting.py  untrusted-content prompt builder
-  patch.py             edit validation and diffs    agent.py      M1 pipeline and run artifacts
-  llm/                 backend interface, scripted mock, Anthropic, Ollama
-  benchmark/           tasks, oracle, fixture validator, manifest, retrieval eval (harness side)
-benchmarks/tasks/      10 seeded-bug tasks (repo/, issue.md, hidden_tests/, solution.json, ...)
-tests/                 unit, security and acceptance tests
-docs/                  demo walkthrough, demo inputs, recorded results
+src/coderepair/
+  repo.py security.py issue.py search.py retrieval.py prompting.py patch.py   read-only pipeline (M1)
+  agent.py          context + one model call + validation
+  sandbox/          Docker and Seatbelt backends, runner bundle, results parsing, probes (M2)
+  execution.py      the only path that runs repository code
+  loop.py           repair loop (M3)
+  candidates.py checks.py approval.py                                        ranking and approval (M4)
+  benchmark/        tasks, oracle, validator, hidden-test evaluation, comparative benchmark (M5)
+  cli.py api.py static/                                                      CLI and dashboard (M7)
+benchmarks/tasks/   10 first-party seeded-bug tasks
+benchmarks/public/  12 QuixBugs-derived tasks (MIT; see LICENSE_NOTES.md)
+scripts/            public-subset builder, M1 smoke run
+docs/               demo, demo inputs, recorded results
+tests/              unit, security, sandbox, loop, review, public-suite and API tests
 ```
 
 ## Documentation
@@ -91,3 +133,5 @@ docs/                  demo walkthrough, demo inputs, recorded results
 [PLAN.md](PLAN.md) · [PROGRESS.md](PROGRESS.md) · [ARCHITECTURE.md](ARCHITECTURE.md) ·
 [TESTING.md](TESTING.md) · [BENCHMARK.md](BENCHMARK.md) · [LICENSE_NOTES.md](LICENSE_NOTES.md) ·
 [docs/DEMO.md](docs/DEMO.md)
+
+The project license has not been chosen yet (see LICENSE_NOTES.md).

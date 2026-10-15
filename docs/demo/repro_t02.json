@@ -1,0 +1,5 @@
+[
+  "{\"summary\": \"Cosmetic change (does not fix the bug).\", \"edits\": [{\"path\": \"notes/models.py\", \"old\": \"        self.tags = tags\\n\", \"new\": \"        self.tags = tags  # tags\\n\"}]}",
+  "{\n  \"summary\": \"Avoid a shared mutable default: default tags to None and give every note its own list.\",\n  \"edits\": [\n    {\n      \"path\": \"notes/models.py\",\n      \"old\": \"    def __init__(self, title: str, body: str = \\\"\\\", tags: list[str] = []) -> None:\\n\",\n      \"new\": \"    def __init__(self, title: str, body: str = \\\"\\\", tags: list[str] | None = None) -> None:\\n\"\n    },\n    {\n      \"path\": \"notes/models.py\",\n      \"old\": \"        self.tags = tags\\n\",\n      \"new\": \"        self.tags = [] if tags is None else list(tags)\\n\"\n    }\n  ]\n}\n",
+  "{\"summary\": \"A note created without tags must not share another note's tags.\", \"test_code\": \"from notes.models import Note\\n\\n\\ndef test_default_tags_are_not_shared_between_notes():\\n    first = Note(\\\"first\\\")\\n    first.add_tag(\\\"x\\\")\\n    assert Note(\\\"second\\\").tags == []\\n\"}"
+]

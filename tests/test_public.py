@@ -87,3 +87,19 @@ def test_public_suite_never_runs_on_the_host(monkeypatch):
     monkeypatch.setattr(validate.HostFixtureRunner, "__call__", forbidden)
     # 0 with a sandbox; 2 ("no sandbox available") on machines without one.
     assert main(["validate-fixtures", "--suite", "public", PUBLIC_IDS[0]]) in (0, 2)
+
+
+@pytest.mark.parametrize("task_id", PUBLIC_IDS)
+def test_issue_never_quotes_a_hidden_test_case(task_id):
+    """The issue's example must not be one of the held-out cases (review finding)."""
+    import ast
+
+    task = BY_ID[task_id]
+    name = task_id.split("_", 1)[1]
+    issue = task.read_issue()
+    for hidden in task.hidden_test_files():
+        for node in ast.walk(ast.parse(hidden.read_text())):
+            if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "param":
+                args = ast.literal_eval(node.args[0])
+                call = f"{name}({', '.join(json.dumps(a) for a in args)})"
+                assert call not in issue, f"{task_id}: issue quotes hidden case {call}"

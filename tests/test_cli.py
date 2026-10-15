@@ -11,7 +11,7 @@ def test_tasks(capsys):
     assert main(["tasks"]) == 0
     out = capsys.readouterr().out
     assert out.count("\n") == 22  # 10 first-party fixtures + 12 public tasks
-    assert "t10_deep_merge_injection" in out and "q12_lcs_length" in out
+    assert "t10_deep_merge_injection" in out and "q12_" in out
 
 
 def test_propose_with_oracle_prints_banner_and_diff(capsys):

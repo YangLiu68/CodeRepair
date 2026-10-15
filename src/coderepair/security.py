@@ -7,6 +7,7 @@ Everything read from a repository or an issue is treated as untrusted data.
 from __future__ import annotations
 
 import fnmatch
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -105,6 +106,25 @@ def is_sensitive_path(relpath: str) -> bool:
     return any(fnmatch.fnmatchcase(name.lower(), pattern) for pattern in _SENSITIVE_NAME_GLOBS)
 
 
+def same_or_inside(path: Path, parent: Path) -> bool:
+    """True if ``path`` is ``parent`` or below it, comparing inodes (not spellings).
+
+    String comparisons are fooled by case-insensitive file systems (``TASKS`` vs ``tasks``
+    on macOS) and by alternative spellings of the same directory.
+    """
+    try:
+        target = os.stat(parent)
+    except OSError:
+        return False
+    for candidate in (path, *path.parents):
+        try:
+            if os.path.samestat(os.stat(candidate), target):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def _is_within(path: Path, parent: Path) -> bool:
     try:
         path.relative_to(parent)
@@ -134,11 +154,16 @@ def resolve_repo_root(
         raise PolicyError(f"repository path does not exist: {path}") from exc
     if not real.is_dir():
         raise PolicyError(f"repository path is not a directory: {real}")
-    if real == home or _is_within(home, real):
+    if real == home or _is_within(home, real) or same_or_inside(home, real):
         raise PolicyError(f"refusing to ingest the home directory or one of its parents: {real}")
     for denied in denied_locations(home):
         denied_real = denied.resolve() if denied.exists() else denied
-        if _is_within(real, denied_real) or _is_within(real, denied):
+        # Inode comparison as well: on case-insensitive file systems ~/.SSH is ~/.ssh.
+        if (
+            _is_within(real, denied_real)
+            or _is_within(real, denied)
+            or same_or_inside(real, denied)
+        ):
             raise PolicyError(f"refusing to ingest a denied location: {real}")
     roots = [r.expanduser().resolve() for r in allowed_roots]
     if not any(_is_within(real, root) for root in roots):
@@ -271,3 +296,18 @@ def scan_for_injection(text: str, source: str) -> list[InjectionFinding]:
                     excerpt = excerpt[:157] + "..."
                 findings.append(InjectionFinding(source, lineno, rule, severity, excerpt))
     return findings
+
+
+# --------------------------------------------------------------- display safety
+
+# Characters that change how text is displayed: terminal control sequences and Unicode
+# bidirectional overrides ("Trojan Source"). In a patch or test output they can hide code or
+# warnings from a reviewer. Newlines and tabs are not included.
+HIDDEN_CHARS = re.compile(
+    "[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]"
+)
+
+
+def display_safe(text: str) -> str:
+    """Show hidden characters as visible ``\\uXXXX`` escapes before printing untrusted text."""
+    return HIDDEN_CHARS.sub(lambda m: f"\\u{ord(m.group()):04x}", text)

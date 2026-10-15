@@ -1,0 +1,5 @@
+[
+  "{\"summary\": \"Pages are 1-indexed (anchor copied with escaped newlines).\", \"edits\": [{\"path\": \"pager/core.py\", \"old\": \"    start = page * per_page\\\\n\", \"new\": \"    start = (page - 1) * per_page\\\\n\"}]}",
+  "{\"summary\": \"Offset pages correctly (wrong fix).\", \"edits\": [{\"path\": \"pager/core.py\", \"old\": \"    start = page * per_page\\n\", \"new\": \"    start = page + 0 * per_page\\n\"}]}",
+  "{\n  \"summary\": \"Pages are 1-indexed, so the first item of page N is at offset (N - 1) * per_page.\",\n  \"edits\": [\n    {\n      \"path\": \"pager/core.py\",\n      \"old\": \"    start = page * per_page\\n\",\n      \"new\": \"    start = (page - 1) * per_page\\n\"\n    }\n  ]\n}\n"
+]

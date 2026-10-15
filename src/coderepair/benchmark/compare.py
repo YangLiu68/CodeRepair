@@ -45,6 +45,7 @@ from ..repo import ingest_repository
 from ..sandbox.base import Sandbox, SandboxLimits
 from ..trace import Trace, new_run_id
 from .evaluate import PatchEvaluation, evaluate_patch
+from .manifest import task_fingerprint
 from .tasks import TaskSpec
 
 AGENTS = ("direct", "retrieval", "feedback")
@@ -77,6 +78,8 @@ class BenchRow:
     p2p_broken: int
     diff_lines: int
     detail: str = ""
+    #: content hash of the task (repo, issue, tests, solution) the row was produced on
+    task_hash: str = ""
 
     def key(self) -> tuple[str, str]:
         return (self.task_id, self.agent)
@@ -91,6 +94,8 @@ def _tokens(attempts: list[AttemptResult]) -> tuple[int, int, float]:
 
 def classify_invalid(errors: list[str]) -> str:
     text = " ".join(errors)
+    if "sandbox error" in text or "test run failed to start" in text:
+        return "sandbox-error"
     if "backend error" in text:
         return "backend-error"
     if "could not parse" in text:
@@ -176,19 +181,25 @@ def run_agent(
             task.read_issue(),
             backend,
             sandbox,
+            # Same call budget as the sampling agents: no extra samples, no reproduction
+            # test (candidates=1, repro_test=False), so every model call is a loop attempt.
             budget=RepairBudget(
                 max_attempts=budget.max_calls,
                 max_total_tokens=budget.max_tokens,
                 max_wall_s=budget.max_wall_s,
+                candidates=1,
+                repro_test=False,
             ),
             limits=limits,
             sandbox_limits=sandbox_limits,
             task_id=task.id,
         )
-        attempts = [a.result for a in run.attempts]
-        first = attempts[0] if attempts else None
+        attempts = [a.result for a in run.attempts] + list(run.samples)
+        first = run.attempts[0].result if run.attempts else None
         overlay = run.selected.candidate.changed_files if run.selected else None
-        last_errors = attempts[-1].errors if attempts else [run.stop_reason]
+        last_errors = (attempts[-1].errors if attempts else []) or [run.stop_reason]
+        if overlay is None and "sandbox" in run.stop_reason:
+            last_errors = [f"sandbox error: {run.stop_reason}"]
     else:
         raise ValueError(f"unknown agent {agent!r}")
 
@@ -215,7 +226,7 @@ def run_agent(
     if overlay is None:
         row.failure = classify_invalid(last_errors)
         row.detail = "; ".join(last_errors)[:300]
-        if row.failure == "backend-error":
+        if row.failure in ("backend-error", "sandbox-error"):
             row.status = "error"
     else:
         evaluation = evaluate_patch(task, overlay, sandbox, limits=sandbox_limits)
@@ -252,8 +263,14 @@ def _diff_for(task: TaskSpec, overlay: dict[str, str], limits: Limits) -> str:
 # ------------------------------------------------------------------- aggregation
 
 
+def task_hash(task: TaskSpec) -> str:
+    return hashlib.sha256(json.dumps(task_fingerprint(task), sort_keys=True).encode()).hexdigest()[
+        :16
+    ]
+
+
 def config_fingerprint(meta: dict) -> str:
-    keys = ("backend", "model", "budget", "agents")
+    keys = ("backend", "model", "budget", "agents", "sandbox", "sandbox_limits")
     return hashlib.sha256(
         json.dumps({k: meta[k] for k in keys}, sort_keys=True).encode()
     ).hexdigest()[:12]
@@ -347,36 +364,50 @@ def run_benchmark(
         "budget": asdict(budget),
         "agents": list(agents),
         "sandbox": sandbox.name,
+        "sandbox_limits": asdict(sandbox_limits or SandboxLimits()),
         "date": datetime.now(UTC).isoformat(timespec="seconds"),
         "machine": f"{platform.system()} {platform.machine()} / Python {platform.python_version()}",
     }
     fingerprint = config_fingerprint(meta)
-    rows: list[BenchRow] = []
-    done: set[tuple[str, str]] = set()
+    hashes = {task.id: task_hash(task) for _, task in tasks}
+    wanted = {(task.id, agent) for _, task in tasks for agent in agents}
+    done: dict[tuple[str, str], BenchRow] = {}
     if out_path.exists():
         for line in out_path.read_text(encoding="utf-8").splitlines():
-            record = json.loads(line)
-            if record.get("config") == fingerprint:
+            try:
+                record = json.loads(line)
                 row = BenchRow(**record["row"])
-                rows.append(row)
-                done.add(row.key())
+            except (ValueError, KeyError, TypeError):
+                continue  # e.g. a line truncated by an interrupted run
+            # Reuse only rows from the same configuration, on unchanged task content,
+            # for the (task, agent) pairs requested now.
+            if (
+                record.get("config") == fingerprint
+                and row.key() in wanted
+                and row.task_hash == hashes.get(row.task_id)
+            ):
+                done[row.key()] = row
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("a", encoding="utf-8") as fh:
         for suite, task in tasks:
             for agent in agents:
                 if (task.id, agent) in done:
                     continue
-                row = run_agent(
-                    agent,
-                    task,
-                    backend_for(task),
-                    sandbox,
-                    suite=suite,
-                    budget=budget,
-                    limits=limits,
-                    sandbox_limits=sandbox_limits,
-                )
-                rows.append(row)
+                try:
+                    row = run_agent(
+                        agent,
+                        task,
+                        backend_for(task),
+                        sandbox,
+                        suite=suite,
+                        budget=budget,
+                        limits=limits,
+                        sandbox_limits=sandbox_limits,
+                    )
+                except Exception as exc:  # noqa: BLE001 - one bad row must not end the run
+                    row = _error_row(suite, task, agent, backend, exc)
+                row.task_hash = hashes[task.id]
+                done[row.key()] = row
                 fh.write(json.dumps({"config": fingerprint, "row": asdict(row)}) + "\n")
                 fh.flush()
                 progress(
@@ -384,4 +415,28 @@ def run_benchmark(
                     f"calls={row.calls} tokens={row.input_tokens + row.output_tokens} "
                     f"llm={row.llm_latency_s}s"
                 )
+    rows = [done[key] for key in sorted(done)]
     return {"meta": meta, "config": fingerprint, "summary": summarize(rows), "rows": rows}
+
+
+def _error_row(suite: str, task: TaskSpec, agent: str, backend: LLMBackend, exc: Exception):
+    return BenchRow(
+        suite=suite,
+        task_id=task.id,
+        agent=agent,
+        backend=backend.name,
+        model=backend.model,
+        status="error",
+        resolved=False,
+        pass_at_1=False,
+        failure="harness-error",
+        calls=0,
+        input_tokens=0,
+        output_tokens=0,
+        llm_latency_s=0.0,
+        wall_s=0.0,
+        f2p_passing="",
+        p2p_broken=0,
+        diff_lines=0,
+        detail=f"{type(exc).__name__}: {exc}"[:300],
+    )

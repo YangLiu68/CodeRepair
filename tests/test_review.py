@@ -328,3 +328,206 @@ def test_fixture_tasks_are_protected_from_apply(approved_setup, monkeypatch, cap
     monkeypatch.setenv("CODEREPAIR_ALLOWED_ROOTS", str(TASKS_DIR))
     code = main(["apply", run.run_id, "--repo", str(task("t01_paginate_off_by_one").repo_dir)])
     assert code == 2 and "protected" in capsys.readouterr().err
+
+
+# ------------------------------------------------- regressions from the M4-M7 review
+
+
+def test_type_check_cannot_be_hijacked_by_a_repository_module(tmp_path):
+    """A repo with its own mypy.py / typing_extensions.py must not run on the host."""
+    marker = tmp_path / "hijacked"
+    payload = f"import pathlib\npathlib.Path({str(marker)!r}).write_text('x')\n"
+    repo = tmp_path / "repo"
+    (repo / "pkg").mkdir(parents=True)
+    (repo / "pkg" / "__init__.py").write_text("def f():\n    return 1\n")
+    for name in ("mypy.py", "typing_extensions.py", "sitecustomize.py"):
+        (repo / name).write_text(payload)
+    snapshot = ingest_repository(repo, (tmp_path,))
+    result = typecheck_delta(snapshot, {"pkg/__init__.py": "def f():\n    return 2\n"})
+    # mypy may refuse to analyse a tree that shadows library modules ("error" is never a
+    # pass); what matters is that the planted modules did not execute.
+    assert result.status in ("ok", "skipped", "error")
+    assert not marker.exists()
+
+
+def test_hidden_characters_are_flagged_and_never_printed_raw(capsys):
+    from coderepair.cli import colorize_diff
+    from coderepair.security import display_safe
+
+    snapshot = snapshot_of(T07)
+    sneaky = T07_RAISE + "        # \x1b[1A\x1b[2K harmless\n        x = '‮'\n"
+    rules = {f.rule for f in security_review(snapshot, _t07_with(sneaky))}
+    assert "hidden-characters" in rules
+    shown = colorize_diff("+# \x1b[1A\x1b[2K\n+x = '‮'\n", color=False)
+    assert "\x1b" not in shown and "‮" not in shown
+    assert "\\u001b" in shown and "\\u202e" in shown
+    assert display_safe("tab\tand newline\n") == "tab\tand newline\n"
+
+
+def test_writes_never_follow_symlinked_directories(tmp_path):
+    """If tests/ (or any parent) is a symlink, nothing is written through it."""
+    import os
+
+    from coderepair.approval import _check_target, _write_target
+
+    root = tmp_path / "repo"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (root / "tests").symlink_to(outside, target_is_directory=True)
+    (root / "pkg").mkdir()
+    (root / "pkg" / "mod.py").write_text("x = 1\n")
+    (root / "pkg" / "link.py").symlink_to(outside / "target.py")
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(ApprovalError, match="refusing to write through"):
+            _check_target(fd, "tests/test_new.py", None)
+        with pytest.raises(ApprovalError, match="refusing to write through"):
+            _write_target(fd, "tests/test_new.py", "x")
+        with pytest.raises(ApprovalError, match="not a regular file"):
+            _check_target(fd, "pkg/link.py", "")
+        with pytest.raises(ApprovalError, match="changed since the run"):
+            _check_target(fd, "pkg/mod.py", "x = 2\n")
+        _check_target(fd, "pkg/mod.py", "x = 1\n")
+        _write_target(fd, "pkg/mod.py", "x = 3\n")
+    finally:
+        os.close(fd)
+    assert list(outside.iterdir()) == []
+    assert (root / "pkg" / "mod.py").read_text() == "x = 3\n"
+
+
+def test_apply_is_bound_to_the_approved_repository_and_reproduction_test(approved_setup, tmp_path):
+    run, repos = approved_setup
+    twin = repos / "pager-copy"
+    shutil.copytree(repos / "pager", twin)
+    approve(run.run_dir, candidate=1, reviewer="alice")
+    with pytest.raises(ApprovalError, match="this approval is for"):
+        apply_approved(run.run_dir, twin, allowed_roots=(repos,))
+
+
+def test_reproduction_test_cannot_be_swapped_after_approval(sandbox, tmp_path):
+    repos = tmp_path / "repos"
+    shutil.copytree(task("t02_mutable_default_tags").repo_dir, repos / "notes")
+    t = task("t02_mutable_default_tags")
+    run = repair(
+        ingest_repository(repos / "notes", (repos,)),
+        t.read_issue(),
+        ScriptedBackend([T02_GOLD, T02_REPRO]),
+        sandbox,
+        budget=RepairBudget(repro_test=True),
+        runs_dir=tmp_path / "runs",
+    )
+    approve(run.run_dir, candidate=None, reviewer="alice", include_reproduction_test=True)
+    summary_path = run.run_dir / "summary.json"
+    summary = json.loads(summary_path.read_text())
+    summary["reproduction_test"]["code"] += "\nimport os\n"
+    summary_path.write_text(json.dumps(summary))
+    with pytest.raises(ApprovalError, match="reproduction test changed"):
+        apply_approved(run.run_dir, repos / "notes", allowed_roots=(repos,))
+
+
+def test_protected_roots_are_compared_by_inode(tmp_path):
+    from coderepair.security import same_or_inside
+
+    protected = tmp_path / "bench" / "tasks"
+    (protected / "t01" / "repo").mkdir(parents=True)
+    variant = tmp_path / "bench" / "TASKS" / "t01" / "repo"
+    if not variant.exists():
+        pytest.skip("case-sensitive file system")
+    assert same_or_inside(variant, protected)
+    assert not same_or_inside(tmp_path, protected)
+
+
+def test_no_extra_model_calls_unless_more_candidates_are_requested(sandbox):
+    wrong = json.dumps(
+        {
+            "summary": "x",
+            "edits": [
+                {
+                    "path": "pager/core.py",
+                    "old": "    start = page * per_page\n",
+                    "new": "    start = page + 0 * per_page\n",
+                }
+            ],
+        }
+    )
+    t = task("t01_paginate_off_by_one")
+    backend = ScriptedBackend([wrong, wrong, wrong])
+    run = repair(
+        snapshot_of(t.id),
+        t.read_issue(),
+        backend,
+        sandbox,
+        budget=RepairBudget(max_attempts=2),
+        task_id=t.id,
+    )
+    assert run.samples == [] and len(backend.requests) == 2
+
+
+def test_passing_candidates_survive_the_scoring_cap(sandbox, monkeypatch):
+    import coderepair.loop as loop
+
+    monkeypatch.setattr(loop, "MAX_SCORED_CANDIDATES", 1)
+    t = task("t01_paginate_off_by_one")
+    wrong = json.dumps(
+        {
+            "summary": "x",
+            "edits": [
+                {
+                    "path": "pager/core.py",
+                    "old": "    start = page * per_page\n",
+                    "new": "    start = page + 0 * per_page\n",
+                }
+            ],
+        }
+    )
+    gold = t.solution_path.read_text()
+    run = repair(snapshot_of(t.id), t.read_issue(), ScriptedBackend([wrong, gold]), sandbox)
+    assert run.status == LOOP_FIXED and "(page - 1)" in run.diff
+
+
+def test_skipped_baseline_tests_are_not_failures():
+    from coderepair.agent import AttemptResult
+    from coderepair.candidates import Candidate, score_candidates
+    from coderepair.patch import apply_proposal
+    from coderepair.sandbox.base import SandboxResult
+    from coderepair.sandbox.results import TestResults
+    from coderepair.trace import Trace
+
+    snapshot = snapshot_of("t01_paginate_off_by_one")
+    patch = apply_proposal(snapshot, task("t01_paginate_off_by_one").load_solution())
+    baseline = SandboxResult(
+        "x", "x", 1, 0.1, results=TestResults({"a": "failed", "b": "skipped", "c": "passed"}, (), 1)
+    )
+    visible = SandboxResult(
+        "x", "x", 0, 0.1, results=TestResults({"a": "passed", "b": "skipped", "c": "passed"}, (), 0)
+    )
+    candidate = Candidate(1, "x", AttemptResult("proposed", patch=patch), visible)
+    (card,) = score_candidates([candidate], snapshot, baseline, None, None, Trace("x"))
+    assert card.fixes == ["a"] and card.regressions == [] and card.visible_all_pass
+
+
+def test_sandbox_failure_while_scoring_affects_only_that_candidate(monkeypatch):
+    import coderepair.candidates as candidates_mod
+    from coderepair.agent import AttemptResult
+    from coderepair.candidates import Candidate, score_candidates
+    from coderepair.patch import apply_proposal
+    from coderepair.sandbox.base import SandboxError
+    from coderepair.trace import Trace
+
+    def broken(*args, **kwargs):
+        raise SandboxError("sandbox-exec missing")
+
+    monkeypatch.setattr(candidates_mod, "run_repo_tests", broken)
+    snapshot = snapshot_of("t01_paginate_off_by_one")
+    patch = apply_proposal(snapshot, task("t01_paginate_off_by_one").load_solution())
+    candidate = Candidate(1, "x", AttemptResult("proposed", patch=patch))
+    (card,) = score_candidates([candidate], snapshot, None, None, None, Trace("x"))
+    assert not card.visible_all_pass and "visible tests not run" in card.problems[0]
+
+
+def test_deeply_nested_model_output_is_rejected_not_crashing():
+    from coderepair.patch import ProposalParseError, parse_proposal
+
+    with pytest.raises(ProposalParseError):
+        parse_proposal("[" * 50_000)

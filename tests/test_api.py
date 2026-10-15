@@ -11,7 +11,7 @@ TASK = "t05_lru_recency"
 
 @pytest.fixture
 def client(settings):
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings, extra_hosts=("testserver",)))
 
 
 def test_health_and_security_headers(client):

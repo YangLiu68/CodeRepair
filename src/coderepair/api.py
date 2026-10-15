@@ -40,7 +40,7 @@ from .security import PolicyError
 from .trace import RUN_ID_RE, read_trace
 
 STATIC_DIR = Path(__file__).parent / "static"
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "[::1]", "testserver"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "[::1]"]
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
     "img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
@@ -72,10 +72,11 @@ class ApprovalRequest(BaseModel):
     note: str = Field(default="", max_length=500)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, extra_hosts: tuple[str, ...] = ()) -> FastAPI:
+    """``extra_hosts`` exists for the test client (``testserver``); never for real use."""
     settings = settings or Settings.from_env()
     app = FastAPI(title="CodeRepair", version=__version__, docs_url="/api/docs", redoc_url=None)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[*ALLOWED_HOSTS, *extra_hosts])
 
     @app.middleware("http")
     async def security_headers(request, call_next):

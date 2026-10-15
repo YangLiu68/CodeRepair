@@ -231,7 +231,9 @@ def select_tests(
     files: set[str] = set()
     if baseline is not None and baseline.results is not None:
         files |= {
-            t.split("::", 1)[0] for t, o in baseline.results.outcomes.items() if o != "passed"
+            t.split("::", 1)[0]
+            for t, o in baseline.results.outcomes.items()
+            if o in ("failed", "error")
         }
     snapshot_paths = set(context.index.snapshot.paths())
     for test_id in context.issue.test_ids:
@@ -421,8 +423,9 @@ def repair(
             "the unpatched repository's tests did not produce results: "
             + describe_result(run.baseline)
         )
+    # Skipped tests are not failures: a test skipped before the patch cannot be "fixed".
     baseline_failing = (
-        {t for t, o in run.baseline.results.outcomes.items() if o != "passed"}
+        {t for t, o in run.baseline.results.outcomes.items() if o in ("failed", "error")}
         if run.baseline.results
         else set()
     )
@@ -532,20 +535,25 @@ def _review(
             and time.monotonic() - started < budget.max_wall_s
         )
 
-    pool = [
-        (f"loop attempt {a.index}", a.result, a.full)
-        for a in run.attempts
-        if a.diff and a.duplicate_of is None
-    ]
+    # Passing loop attempts first, so the cap on scored candidates can never drop them.
+    attempts = sorted(
+        (a for a in run.attempts if a.diff and a.duplicate_of is None),
+        key=lambda a: (not a.passed, a.index),
+    )
+    pool = [(f"loop attempt {a.index}", a.result, a.full) for a in attempts]
     passing = sum(1 for a in run.attempts if a.passed)
-    missing = budget.candidates - passing
-    if (
-        missing > 0
-        and budget_left()
-        and not (run.attempts and run.attempts[-1].result.status == STATUS_BACKEND_ERROR)
-    ):
+    # Extra samples only when more than one candidate was asked for (and the budget allows).
+    extra = min(budget.candidates - 1, budget.candidates - passing) if budget.candidates > 1 else 0
+    if extra > 0 and not (run.attempts and run.attempts[-1].result.status == STATUS_BACKEND_ERROR):
         run.samples = sample_candidates(
-            run.context, snapshot, backend, policy, trace, count=missing, start_index=1
+            run.context,
+            snapshot,
+            backend,
+            policy,
+            trace,
+            count=extra,
+            start_index=1,
+            budget_left=budget_left,
         )
         pool += [(f"sample {i}", s, None) for i, s in enumerate(run.samples, start=1)]
     if budget.repro_test and budget_left():
@@ -554,7 +562,14 @@ def _review(
         )
     candidates = distinct_valid(pool)[:MAX_SCORED_CANDIDATES]
     run.scorecards = score_candidates(
-        candidates, snapshot, run.baseline, run.repro, sandbox, trace, sandbox_limits
+        candidates,
+        snapshot,
+        run.baseline,
+        run.repro,
+        sandbox,
+        trace,
+        sandbox_limits,
+        deadline=started + budget.max_wall_s,
     )
 
 

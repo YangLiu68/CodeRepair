@@ -17,7 +17,6 @@ def _normalize(value):
 @pytest.mark.parametrize(
     "args, expected",
     [
-        pytest.param([[[1, [], [2, 3]], [[4]], 5]], [1, 2, 3, 4, 5], id='case0'),
         pytest.param([[[], [], 1, [], 1, [], []]], [1, 1], id='case2'),
         pytest.param([[1, 2, 3, [[4]]]], [1, 2, 3, 4], id='case3'),
         pytest.param([[1, 4, 6]], [1, 4, 6], id='case4'),

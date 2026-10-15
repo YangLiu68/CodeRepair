@@ -84,6 +84,9 @@ def parse_proposal(raw: str) -> PatchProposal:
         except json.JSONDecodeError as exc:
             errors.append(f"invalid JSON: {exc}")
             continue
+        except (RecursionError, ValueError) as exc:  # absurd nesting or number sizes
+            errors.append(f"invalid JSON: {type(exc).__name__}")
+            continue
         try:
             return PatchProposal.model_validate(data)
         except ValidationError as exc:

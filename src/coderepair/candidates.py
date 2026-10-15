@@ -23,6 +23,8 @@ from __future__ import annotations
 import ast
 import json
 import sys
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
 from .agent import STATUS_PROPOSED, AttemptResult, RepairContext, attempt_proposal
@@ -32,7 +34,7 @@ from .llm.base import BackendError, LLMBackend
 from .patch import PatchPolicy
 from .prompting import build_repro_request
 from .repo import RepoSnapshot
-from .sandbox.base import Sandbox, SandboxLimits, SandboxResult
+from .sandbox.base import Sandbox, SandboxError, SandboxLimits, SandboxResult
 from .search import module_name
 from .trace import Trace
 
@@ -115,6 +117,8 @@ class Scorecard:
     security: list[SecurityFinding] = field(default_factory=list)
     diff_lines: int = 0
     rank: int = 0
+    #: Infrastructure problems while scoring (a sandbox that failed to start, ...).
+    problems: list[str] = field(default_factory=list)
 
     @property
     def high_risk(self) -> list[SecurityFinding]:
@@ -148,6 +152,7 @@ class Scorecard:
         medium = len(self.security) - len(self.high_risk)
         reasons.append(f"security: {len(self.high_risk)} high, {medium} medium")
         reasons.append(f"{self.diff_lines} changed line(s)")
+        reasons += [f"scoring problem: {p}" for p in self.problems]
         return reasons
 
     def to_dict(self) -> dict:
@@ -166,6 +171,7 @@ class Scorecard:
             "reasons": self.reasons(),
             "files_changed": sorted(self.candidate.changed_files),
             "warnings": self.candidate.attempt.warnings,
+            "problems": self.problems,
         }
 
 
@@ -241,7 +247,7 @@ def generate_repro_test(
     try:
         payload = json.loads(response.text)
         code, summary = str(payload["test_code"]), str(payload.get("summary", ""))
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, RecursionError) as exc:
         return ReproTest("invalid", detail=f"unparseable response: {exc}", tokens=tokens)
     path = repro_test_path(snapshot)
     if path in snapshot.files:
@@ -250,9 +256,13 @@ def generate_repro_test(
     if problem:
         trace.add("repro_rejected", reason=problem)
         return ReproTest("invalid", path, code, summary, problem, tokens=tokens)
-    baseline = run_repo_tests(
-        snapshot, sandbox, extra_files={path: code}, selectors=[path], limits=limits
-    )
+    try:
+        baseline = run_repo_tests(
+            snapshot, sandbox, extra_files={path: code}, selectors=[path], limits=limits
+        )
+    except SandboxError as exc:
+        trace.add("repro_error", error=str(exc))
+        return ReproTest("unavailable", path, code, summary, f"sandbox error: {exc}", tokens=tokens)
     repro = ReproTest("does-not-reproduce", path, code, summary, baseline=baseline, tokens=tokens)
     results = baseline.results
     if baseline.limit_exceeded or results is None or baseline.problems:
@@ -285,10 +295,17 @@ def sample_candidates(
     *,
     count: int,
     start_index: int,
+    budget_left: Callable[[], bool] = lambda: True,
 ) -> list[AttemptResult]:
-    """Independent samples from the base prompt (no feedback), for diversity."""
+    """Independent samples from the base prompt (no feedback), for diversity.
+
+    ``budget_left`` is checked before every call, so samples never overrun the run's
+    token or time budget by more than one call."""
     samples = []
     for i in range(count):
+        if not budget_left():
+            trace.add("sample_skipped", reason="budget exhausted")
+            break
         request = replace(context.bundle.request, sample_index=start_index + i)
         trace.add("sample_start", sample=start_index + i)
         samples.append(attempt_proposal(request, backend, snapshot, policy, trace))
@@ -300,6 +317,10 @@ def sample_candidates(
 # ----------------------------------------------------------------------- scoring
 
 
+def _failed_or_error(outcome: str | None) -> bool:
+    return outcome in ("failed", "error")
+
+
 def score_candidates(
     candidates: list[Candidate],
     snapshot: RepoSnapshot,
@@ -308,37 +329,55 @@ def score_candidates(
     sandbox: Sandbox,
     trace: Trace,
     limits: SandboxLimits | None = None,
+    deadline: float | None = None,
 ) -> list[Scorecard]:
+    """Score and rank candidates. A sandbox failure affects only the candidate it hit;
+    static checks are skipped (and reported as skipped) once ``deadline`` has passed."""
     baseline_outcomes = baseline.results.outcomes if baseline and baseline.results else {}
     cards = []
     for candidate in candidates:
-        if candidate.visible is None:
-            candidate.visible = run_repo_tests(
-                snapshot, sandbox, overlay=candidate.changed_files, limits=limits
-            )
         card = Scorecard(candidate)
+        if candidate.visible is None:
+            try:
+                candidate.visible = run_repo_tests(
+                    snapshot, sandbox, overlay=candidate.changed_files, limits=limits
+                )
+            except SandboxError as exc:
+                card.problems.append(f"visible tests not run: {exc}")
         visible = candidate.visible
-        outcomes = visible.results.outcomes if visible.completed else {}
-        card.visible_all_pass = bool(visible.completed and visible.results.all_passed)
+        outcomes = visible.results.outcomes if visible is not None and visible.completed else {}
+        card.visible_all_pass = bool(
+            visible is not None and visible.completed and visible.results.all_passed
+        )
         card.fixes = sorted(
-            t for t, o in baseline_outcomes.items() if o != "passed" and outcomes.get(t) == "passed"
+            t
+            for t, o in baseline_outcomes.items()
+            if _failed_or_error(o) and outcomes.get(t) == "passed"
         )
         card.regressions = sorted(
             t for t, o in baseline_outcomes.items() if o == "passed" and outcomes.get(t) != "passed"
         )
         if repro is not None and repro.usable:
-            run = run_repo_tests(
-                snapshot,
-                sandbox,
-                overlay=candidate.changed_files,
-                extra_files={repro.path: repro.code},
-                selectors=[repro.path],
-                limits=limits,
-            )
-            ok = run.completed and run.results.all_passed
-            card.repro = REPRO_VERIFIED if ok else REPRO_FAILED
-        card.lint = lint_delta(snapshot, candidate.changed_files)
-        card.types = typecheck_delta(snapshot, candidate.changed_files)
+            try:
+                run = run_repo_tests(
+                    snapshot,
+                    sandbox,
+                    overlay=candidate.changed_files,
+                    extra_files={repro.path: repro.code},
+                    selectors=[repro.path],
+                    limits=limits,
+                )
+            except SandboxError as exc:
+                card.problems.append(f"reproduction test not run: {exc}")
+            else:
+                ok = run.completed and run.results.all_passed
+                card.repro = REPRO_VERIFIED if ok else REPRO_FAILED
+        if deadline is not None and time.monotonic() > deadline:
+            card.lint = CheckResult("ruff", "skipped", detail="time budget exhausted")
+            card.types = CheckResult("mypy", "skipped", detail="time budget exhausted")
+        else:
+            card.lint = lint_delta(snapshot, candidate.changed_files)
+            card.types = typecheck_delta(snapshot, candidate.changed_files)
         card.security = security_review(snapshot, candidate.changed_files)
         patch = candidate.attempt.patch
         card.diff_lines = (patch.lines_added + patch.lines_removed) if patch else 0

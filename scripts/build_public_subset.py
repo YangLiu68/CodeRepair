@@ -14,12 +14,13 @@ CodeRepair tasks under ``benchmarks/public/``:
   the buggy program actually returned.
 
 Leakage controls: the corrected program, the upstream test files and any
-QuixBugs naming are never placed in ``repo/`` or the issue; outputs observed
-from running code are produced in the sandbox; the checkout is read as text and
-never imported on the host. Selection rule (fixed before any model was run):
-the first ``--count`` programs in alphabetical order, among those that are
-self-contained (no graph/node helpers), whose upstream correction passes every
-case, and whose bug fails at least one case.
+QuixBugs naming are never placed in ``repo/`` or the issue; the issue quotes
+only a failing case that is not among the hidden tests; outputs observed from
+running code are produced in the sandbox; the checkout is read as text and never
+imported on the host. Selection rule (fixed before any model was run on these
+tasks): the first ``--count`` programs in alphabetical order, among those that
+are self-contained (no graph/node helpers), whose upstream correction passes
+every case, and whose bug fails at least two cases.
 
 Usage:
     uv run python scripts/build_public_subset.py --source /path/to/QuixBugs --commit <sha>
@@ -235,13 +236,14 @@ def run_cases(sandbox, repo_files: dict[str, str], name: str, cases, overlay=Non
     return outcomes, observed
 
 
-def issue_text(name: str, failing: list[tuple[int, list]], observed: dict, visible_failing):
+def issue_text(name: str, reported: list[tuple[int, list]], observed: dict, visible_failing):
+    """Bug report built only from the reported example, which is never a hidden test."""
     lines = [f"# `{name}` returns wrong results for some inputs", ""]
     lines.append(
         f"`{name}` in `algo/{name}.py` does not do what its docstring specifies for every input."
     )
     lines.append("")
-    for index, (args, expected) in failing[:2]:
+    for index, (args, expected) in reported:
         call = f"{name}({', '.join(json.dumps(a) for a in args)})"
         record = observed.get(index, {})
         if record.get("error") == "TimeoutError":
@@ -320,25 +322,24 @@ def build(source: Path, commit: str, count: int, sandbox_name: str) -> int:
             continue
         failing = [(i, c) for i, c in cases if buggy_outcomes.get(i) == "failed"]
         passing = [(i, c) for i, c in cases if buggy_outcomes.get(i) == "passed"]
-        if not failing:
-            report.append(f"skip {name}: the bug fails no test case")
+        if len(failing) < 2:
+            # One failing case is needed for the issue (or the visible test) and at least
+            # one other must stay hidden, so the issue never quotes a hidden test.
+            report.append(f"skip {name}: the bug fails fewer than two test cases")
             continue
         built += 1
         task_id = f"q{built:02d}_{name}"
         visible = passing[:2]
         visible_failing_id = None
+        reported = failing[:1]  # the example the issue describes; never hidden
         if built % 2 == 0 or not visible:
-            visible = visible + failing[:1]
-            visible_failing_id = f"tests/test_{name}.py::test_{name}[case{failing[0][0]}]"
-        visible_ids = {i for i, _ in visible}
-        hidden = [c for c in failing if c[0] not in visible_ids][:MAX_HIDDEN_FAILING] + [
-            c for c in passing if c[0] not in visible_ids
+            visible = visible + reported
+            visible_failing_id = f"tests/test_{name}.py::test_{name}[case{reported[0][0]}]"
+        excluded = {i for i, _ in visible} | {i for i, _ in reported}
+        hidden = [c for c in failing if c[0] not in excluded][:MAX_HIDDEN_FAILING] + [
+            c for c in passing if c[0] not in excluded
         ][:MAX_HIDDEN_PASSING]
         hidden.sort()
-        if not any(i in {f for f, _ in failing} for i, _ in hidden):
-            report.append(f"skip {name}: no failing case left for the hidden tests")
-            built -= 1
-            continue
         task_dir = OUT / task_id
         repo = task_dir / "repo"
         for rel, text in repo_files.items():
@@ -352,7 +353,7 @@ def build(source: Path, commit: str, count: int, sandbox_name: str) -> int:
             test_module(name, hidden, hidden=True), encoding="utf-8"
         )
         (task_dir / "issue.md").write_text(
-            issue_text(name, failing, observed, visible_failing_id), encoding="utf-8"
+            issue_text(name, reported, observed, visible_failing_id), encoding="utf-8"
         )
         (task_dir / "solution.json").write_text(
             proposal.model_dump_json(indent=2) + "\n", encoding="utf-8"

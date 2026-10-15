@@ -3,87 +3,87 @@
   "tasks": {
     "q01_bitcount": {
       "repo": "a2d893dc8ed97dfb9da3590bf8de43af1767ce0369ed97a44f6a116735a6a824",
-      "issue": "fb68f18ae665fe0dec4cc4ee5d991d0755595d4227a6ae00b81c3c589bf4de38",
+      "issue": "0d0d11e3dc0846154c9cf80112ce1812f67a2a362b1db5852691b64656aeb904",
       "solution": "98f833a0c1f34683938216505f1031b89e958fac303c962a2bf5c3729cfa3426",
       "hidden_tests": "06bf1b5177586373870041c772b9acff56d97494c2ba9f63a4159251f396903a",
       "task_toml": "9eb420a1419e09aaa9617cdc1c35002bc5574ed9e79ce5e822f8b412baf5e196"
     },
     "q02_bucketsort": {
       "repo": "b174b32f9d4fdadf2e1d97c8ddb0f5825bb26bc316234b133989477beb52bb19",
-      "issue": "559cb9e6628bed7d0192855b8009c709bd7d5eb204cdb34659eb2edd201088d0",
+      "issue": "3a7973751098d701c5633570dafbdf3ba9cd63b9b76a2d06969954d1c7d0148d",
       "solution": "858d2809cdd84d00f69929112b71f8d5f427fcdf69c552c53948f9937a8bd185",
       "hidden_tests": "96e6dc385c5a5a6ddee78f1e5d45bfabb76189c40b0428facebff33aa50b4c2a",
       "task_toml": "e8cc3bdaf88e9cda5938b84c9bc0e805bb19fd33aee39f01534651f1aef519e8"
     },
     "q03_find_first_in_sorted": {
       "repo": "201ebca13fce9f26aa7692fd09d4ccf53598fc26b990f50a000320a468a3fce5",
-      "issue": "355130c398795a71a1533a76aea87c770034b66b51079f532c3a380123004359",
+      "issue": "69eff6003b168b52207465fd658454df041e35bfc1ea4a8757b849f2936cd6f0",
       "solution": "ba4e9422d502a6081f45e6786ff466e3281715627b37799a8a59096e13bdeccf",
-      "hidden_tests": "42deaef27589ab85a0b789c7460ce3b99c0ffdb7c687d209cb9c7dcfad64b618",
-      "task_toml": "da1ef7426435b79c94e7836f551788fb48431fb7bbb44f4a767b09c7004550c1"
+      "hidden_tests": "7df353859c98a2f418da1834f2cd30a0f4d032641200270ecc52bd5fe23cf23b",
+      "task_toml": "64a45df621167ed168243c1dac266218f6b65675a8c3d69dff8cf8999ad5ad73"
     },
     "q04_find_in_sorted": {
       "repo": "0924f976b8ba04df7c8d70a776255af94ab702ebe334dd1a00aa75b53d756b93",
-      "issue": "5f65d502c87c52c7673bc9843a5a999e3ebc75deee7718ae39632772aca0bdc7",
+      "issue": "9f6d40111b1e25d83533805e7ade076298a4606e32c0847ab9f152c26dcbfc96",
       "solution": "7efc30074af37901f3fb3b47cd48d561a45bbd47e02470797857a1ccb322cce3",
       "hidden_tests": "9fa008fcae123a288b2888ebe00782000d619b046a44d4f5dce09d9ddf75b808",
       "task_toml": "5648369524e6811e4eaa16100eb0ba48b8bd3ecdb7290cb746a989f5d0fbae35"
     },
     "q05_flatten": {
       "repo": "2566128f9163c79b5d51f866dfa30d1274b3232c49ea6f7b2f4007d27562f70c",
-      "issue": "40746dd1ed00226318a0c69a7ae56666bbc54b3f92099cbcb55f9a50895aba0c",
+      "issue": "172ffd5c6ef92897a12ee462afb78e09aaed4bf380efcded48c8d422ac323b6a",
       "solution": "dc95a05eef5761b6150d6a1487a1df6931d2f3cbf5dbc09da1d25191e963e25a",
-      "hidden_tests": "3fa39634a360543d25c309c5e32501564822431f20b1b049280164e455a295a9",
-      "task_toml": "4401a89abd76d29d9ff29c77a116b13732581b3accdc6d7a83eb31b3b74e288d"
+      "hidden_tests": "fdc4c4c8abe4e62af0c677a0c1a20dba48e0f5ee88281d45217eb316c76603e8",
+      "task_toml": "c91585eaf02a2815af5139dd82bf80092a0a53703a76514ca2133304363fca46"
     },
     "q06_gcd": {
       "repo": "0df5816ca0bda7f93327763bbb1b81b6da9627f11d7ccf44889fabc0c58fd45c",
-      "issue": "2e0b37049f053e30943ce114fc324266e1b7320be4971473b326068055c442ff",
+      "issue": "fc0263d21a33ffc855108b72ff2e972ac61a5ebb07b0d2da4ecc1d81f74272b6",
       "solution": "88b1dd84b5e1a40209348f1f697df77342ea346c93390f2a53c6746432735188",
       "hidden_tests": "3a997bb3f7011c50bc377956d7edd910836867812c5267c2f36aebe1c9703b73",
       "task_toml": "41eea70ade09ad22089eb0b1bf2d2bb8369cc154ba8e142935f0e59c6d5ad72b"
     },
     "q07_get_factors": {
       "repo": "36d95cf93117abb4a733926acd8363f3995a4c868487962ab1a73298a2f9ccb1",
-      "issue": "857151b0da197b25b3f6d73aad9c7ea624f0cf5e00757ad02968536179f10b33",
+      "issue": "504e3ee1401b5757870eb4e0c882688ef834837431e4dbcfbe4d3d1329b0faca",
       "solution": "707a7e834eb567f56431d71d8074e2fd7d5332ef8b6e30ff753e05a494225d33",
-      "hidden_tests": "74c42ba62692aac1ddacd7a33c1f49e60c5f01f34a5b31a8e3badfcfa2cd3681",
-      "task_toml": "6da1c864f2fbcbf1b0bb26ef778aaa7b5e58e4e4e6a38ef90313c604eea9fb6b"
+      "hidden_tests": "464fab7ad35f574f0c235825b737052198ce34f0b352b9b086e7564a86e4aa76",
+      "task_toml": "4dc8f0fb6adaf113f114419198a2dba50d1fad0a58f511a034d80501fef21e90"
     },
     "q08_hanoi": {
       "repo": "f1a1e2826efb6bfe0564265fb4f1931c904eeb5b5a93bb72693827bf6bf8957e",
-      "issue": "90b7fb78c9ad29eccee552afcd8afd75cfb6e4cfbc5bbd56783410bc229d0c1d",
+      "issue": "987adf0f50e4337742a5a9ba1985a464f62158a5f15eb38b168ef986611c86f2",
       "solution": "b05f4b20a360674b01ff905fcd54ecbc6615594a003a24eac6ec6401428ef274",
       "hidden_tests": "b85bc34e60844445dda1cc5d88d5057b8605d5b022b755a028d11fc645d2a94f",
       "task_toml": "d422fc6a9d6a7d31dd85d72d966ae89f2736c33806a17be86d4c89667c00aebb"
     },
-    "q09_is_valid_parenthesization": {
-      "repo": "d15568ad718aaad75465157dad31266573d6500c03daba887b46988e1dfcb2d3",
-      "issue": "22bce2228ffc5125ab86bcc6a866895658d135fcebab4e19734f16462b692fee",
-      "solution": "52b2255bae1caefb3b320f9f927873e148497875a75f1231dea75687dadf5f76",
-      "hidden_tests": "2212dec55b9ba546a2d1ae8f8a4f83caa7a627fd05da7d9a3e339743806159bd",
-      "task_toml": "022d38d914f6a91d7729fd75bd7e875d419af7e841788c674b1f1d0032a41d1d"
-    },
-    "q10_kheapsort": {
-      "repo": "219c5d4e64849258ec17374a3aceb06244975df050311b8f8b85ed1a480623d1",
-      "issue": "46af9810e96c7fccfd0e1a87408fe9095bdc7920d1b819f005c392821f02cb13",
+    "q09_kheapsort": {
+      "repo": "6affaa9c82f31233969e4c6b4ffee8ac8502f0113cf96dae612bf3a311ae14a6",
+      "issue": "21814adbfb602d7d6daab10aa745b49d7eafd63dfce612dbaffb4a1cae5d7021",
       "solution": "83271ef9e8f0f4c674f63504a1733ac3726ff0ef557fc8fd338c73f2b85a6465",
       "hidden_tests": "0ec67198dc9b2a181db076712ec363b4b5cd718490aae5bcb01fc2eb0a4e18f1",
-      "task_toml": "2b166817a478a001639275d438c4eb07565b8f9034cd8fa23475a7198b7ce1b2"
+      "task_toml": "91043f1709e60a4323a2ba23fe8d05eb2679966f12edba6b25c316936b8e4ea4"
     },
-    "q11_kth": {
-      "repo": "44031ddadfd5d9e030527f07c9eb32cab81cb313af0180e891be193c3d7c0018",
-      "issue": "860dd48979939adb01640457ba3a3fec566d7814db3d14ffed5c55ccc0a7a751",
+    "q10_kth": {
+      "repo": "0a2dd4569d15c66d0c8ac74f514775d32461af8a748aa39dcfc7e34f84cc5648",
+      "issue": "66ee200f2a7bfce5c61f72ddd043f5fbdce46df89f8130dc84387da3323a3dac",
       "solution": "6729de1fe10bab2304451c1056690694d4f571d591b37eb4b77036f09f31ffa4",
-      "hidden_tests": "1609a94840c0545675f5ae27ea045f7b63330df42d79c2bab1537d4f3e31bdd4",
-      "task_toml": "81babba26b7db81942d5fedf15beb73cdf6b8a50fc08cd7abc9618ab32d8e43f"
+      "hidden_tests": "f98320b1f5d2e8f12ef0df26b4726f88b201b5ba13d45f78e3a09cddbfa7e330",
+      "task_toml": "95a3bde23d58e4f1400f4f0e40546ba842b2124a03dd3aa8a315442bab55cf57"
     },
-    "q12_lcs_length": {
-      "repo": "731c9df5daa6f08e67abc4b986997dafdb44705648333b4f49f37e405482d880",
-      "issue": "8b40db0e8b8ecbc844f89f92ae8d446fb850032558ea75aed2af5c9588745ed0",
+    "q11_lcs_length": {
+      "repo": "1ad643933bdf0318e612b49db05bf3f9bef5cd02406d14314e6a14a7e04b6cb0",
+      "issue": "76ba8a93576ed39dd3109d372291705190776f50b1027c7ec251acc5acae73b2",
       "solution": "e695116f6b6749186f2937fa59d8a811d5fb9de31c6cb39ed4a5fa35fa2372e6",
       "hidden_tests": "24465a74c965d437ff1c2aaa79bf2b34be7bbc20b4df924f511a750b9eadd0e0",
-      "task_toml": "630bb7cafd6e4b78ff1b68a9b1d23f8d6dc91b8f83c0ba8c3524283f4b2e017f"
+      "task_toml": "1eee9c99e495be17a5e78e7d2d8b6af0362e5b4408d9d418e3521fae0c706cf3"
+    },
+    "q12_lis": {
+      "repo": "593d07e7d9667c6470ed9aa33d0d21b802b32335fc75317b4137dbd6ddd5ee04",
+      "issue": "5fdc86b199a5404fe98ecda2d760bda51ec2ea8df20e9393c452613ae09f2e5a",
+      "solution": "be5a705fbcfe5de80bc8097e6f350706ad1c6e9cf4e5f99d701457e4cedba530",
+      "hidden_tests": "4bfa4474e81ab50f6e70d65cfdfafd06be4a869567aff0583fca296167f734e2",
+      "task_toml": "5ff3d52d45495d03b4c69d3e5f4e7b873a2e3abd88c516df0389cdcb0806c2cd"
     }
   }
 }

@@ -1,10 +1,18 @@
 "use strict";
 // All repository, issue, test and model text is rendered with textContent, never as HTML.
 
+// Control and bidirectional-override characters can hide or reorder code ("Trojan Source");
+// they are shown as visible \uXXXX escapes instead.
+const HIDDEN = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+function visible(text) {
+  return String(text).replace(HIDDEN, c => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== undefined && text !== null) node.textContent = String(text);
+  if (text !== undefined && text !== null) node.textContent = visible(text);
   return node;
 }
 
@@ -45,7 +53,9 @@ function table(headers, rows, rowClass) {
     body.appendChild(tr);
   });
   t.appendChild(body);
-  return t;
+  const wrap = el("div", "table-wrap");
+  wrap.appendChild(t);
+  return wrap;
 }
 
 function wrapCell(node) {
@@ -275,11 +285,16 @@ async function loadRuns() {
   list.replaceChildren();
   if (!runs.length) list.appendChild(el("li", "muted", "No runs yet"));
   for (const run of runs) {
-    const item = el("li");
-    const link = el("button", "link", `${run.task_id || "repo"} · ${run.mode === "repair-loop" ? "repair" : "propose"} · ${run.backend}`);
-    link.addEventListener("click", () => { showView("runs"); showRun(run.run_id).catch(showError("run-detail")); });
-    item.appendChild(link);
-    item.appendChild(badge(run.status));
+    const item = el("li", "run-item");
+    const link = el("button", "link", run.task_id || "local repository");
+    link.addEventListener("click", () => {
+      showView("runs");
+      history.replaceState(null, "", `#runs/${run.run_id}`);
+      showRun(run.run_id).catch(showError("run-detail"));
+    });
+    const meta = el("div", "run-meta");
+    meta.append(badge(run.status), el("span", "muted", ` ${run.mode === "repair-loop" ? "repair" : "propose"} · ${run.backend}`));
+    item.append(link, meta);
     list.appendChild(item);
   }
 }
@@ -365,6 +380,8 @@ function showError(target) {
 const loaders = { benchmark: loadBenchmarks, sandbox: loadSandbox };
 
 function showView(name) {
+  if (!["tasks", "runs", "benchmark", "sandbox"].includes(name)) name = "tasks";
+  if (location.hash.slice(1).split("/")[0] !== name) history.replaceState(null, "", `#${name}`);
   for (const tab of document.querySelectorAll(".tab")) tab.classList.toggle("active", tab.dataset.view === name);
   for (const view of document.querySelectorAll(".view")) view.hidden = view.id !== `view-${name}`;
   if (loaders[name]) loaders[name]().catch(showError(name === "benchmark" ? "bench-detail" : "sandbox-detail"));
@@ -383,6 +400,11 @@ async function init() {
     list.appendChild(item);
   }
   await loadRuns();
+  // Deep links: #benchmark, #sandbox, #runs, #runs/<run id>, #tasks/<task id>
+  const [view, id] = decodeURIComponent(location.hash.slice(1)).split("/");
+  if (view) showView(view);
+  if (view === "tasks" && id) showTask(id).catch(showError("task-detail"));
+  if (view === "runs" && id) showRun(id).catch(showError("run-detail"));
 }
 
 init().catch(showError("task-detail"));

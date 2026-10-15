@@ -62,6 +62,8 @@ ul.list { list-style: none; padding: 0; margin: 0 0 20px; }
 ul.list li { margin: 2px 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 button.link { background: none; border: 0; padding: 3px 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; overflow-wrap: anywhere; }
 button.link:hover { text-decoration: underline; }
+ul.list li.run-item { display: block; margin: 0 0 10px; }
+.run-meta { font-size: 13px; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-width: 0; }
 .card { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin: 12px 0; }
 pre { font-family: var(--mono); font-size: 13px; white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin: 0; }
@@ -71,7 +73,8 @@ pre.diff span { display: block; padding: 0 12px; }
 .del { background: var(--del-bg); color: var(--del-fg); }
 .hunk { color: var(--hunk); }
 .hdr { font-weight: 600; }
-table { border-collapse: collapse; width: 100%; font-size: 13px; display: block; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.table-wrap { overflow-x: auto; }
 th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 6px 8px; vertical-align: top; }
 td.num { font-variant-numeric: tabular-nums; width: 4em; }
 td.path { font-family: var(--mono); white-space: nowrap; }

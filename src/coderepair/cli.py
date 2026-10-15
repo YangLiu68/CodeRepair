@@ -30,7 +30,7 @@ from .sandbox.docker import DockerSandbox
 from .sandbox.factory import SANDBOX_NAMES, make_sandbox, sandbox_status
 from .sandbox.probes import PROBES, run_probes
 from .search import RepoIndex
-from .security import PolicyError
+from .security import PolicyError, display_safe
 
 FIRST_PARTY_TASKS = PROJECT_ROOT / "benchmarks" / "tasks"
 PUBLIC_TASKS = PROJECT_ROOT / "benchmarks" / "public"
@@ -58,7 +58,14 @@ def _use_color(args: argparse.Namespace) -> bool:
     )
 
 
+def _say(*parts: object, end: str = "\n") -> None:
+    """print() for text that may contain untrusted content (model, repository, test output)."""
+    print(display_safe(" ".join(str(p) for p in parts)), end=end)
+
+
 def colorize_diff(diff: str, color: bool) -> str:
+    """Render a diff for the terminal; hidden characters are always made visible."""
+    diff = display_safe(diff)
     if not color:
         return diff
     out = []
@@ -154,27 +161,27 @@ def _print_run(run: ProposalRun, color: bool) -> None:
         )
     elif run.is_mock:
         print(f"{banner_color}NOTE: '{run.backend}' is a mock backend (canned responses).{reset}\n")
-    print(f"run:      {run.run_id}")
-    print(f"backend:  {run.backend} ({run.model})")
-    print(f"status:   {run.status}")
-    print(f"context:  {', '.join(f.path for f in run.prompt.files)}")
+    _say(f"run:      {run.run_id}")
+    _say(f"backend:  {run.backend} ({run.model})")
+    _say(f"status:   {run.status}")
+    _say(f"context:  {', '.join(f.path for f in run.prompt.files)}")
     if run.proposal and run.proposal.summary:
-        print(f"summary:  {run.proposal.summary}")
+        _say(f"summary:  {run.proposal.summary}")
     for warning in run.warnings:
-        print(f"{banner_color}warning:{reset}  {warning}")
+        print(f"{banner_color}warning:{reset}  {display_safe(warning)}")
     for error in run.errors:
-        print(f"error:    {error}")
+        _say(f"error:    {error}")
     if run.diff:
         print()
         print(colorize_diff(run.diff, color), end="")
-        print(
+        _say(
             f"\n{run.patch.lines_added} line(s) added, {run.patch.lines_removed} removed. "
             "Nothing was written to the repository; review the diff above."
         )
     if run.tests is not None:
-        print(f"\nvisible tests on the patched copy: {describe_result(run.tests)}")
+        _say(f"\nvisible tests on the patched copy: {describe_result(run.tests)}")
     if run.run_dir:
-        print(f"artifacts: {run.run_dir}")
+        _say(f"artifacts: {run.run_dir}")
 
 
 def cmd_propose(args: argparse.Namespace, settings: Settings) -> int:
@@ -262,33 +269,38 @@ def _print_repair(run: RepairRun, color: bool) -> None:
         print(f"{banner}NOTE: 'oracle' replays the gold solution; NOT a repair result.{reset}\n")
     elif run.is_mock:
         print(f"{banner}NOTE: '{run.backend}' is a mock backend (canned responses).{reset}\n")
-    print(f"run:       {run.run_id}")
-    print(f"backend:   {run.backend} ({run.model})")
-    print(f"sandbox:   {run.isolation}")
+    _say(f"run:       {run.run_id}")
+    _say(f"backend:   {run.backend} ({run.model})")
+    _say(f"sandbox:   {run.isolation}")
     if run.baseline is not None:
-        print(f"baseline:  {describe_result(run.baseline).splitlines()[0]}")
+        _say(f"baseline:  {describe_result(run.baseline).splitlines()[0]}")
     for attempt in run.attempts:
-        print(f"attempt {attempt.index}: {attempt.verdict}")
+        _say(f"attempt {attempt.index}: {attempt.verdict}")
     if run.repro is not None:
-        print(f"reproduction test: {run.repro.status} - {run.repro.detail}")
+        _say(f"reproduction test: {run.repro.status} - {run.repro.detail}")
     if run.scorecards:
-        print("\ncandidates (ranked):")
+        _say("\ncandidates (ranked):")
         for card in run.scorecards:
-            print(f"  #{card.rank} candidate {card.candidate.index} ({card.candidate.source})")
-            print(f"       {'; '.join(card.reasons())}")
-    print(f"\nstatus:    {run.status} ({run.stop_reason})")
-    print(f"tokens:    {run.tokens_used}")
+            _say(f"  #{card.rank} candidate {card.candidate.index} ({card.candidate.source})")
+            _say(f"       {'; '.join(card.reasons())}")
+            for finding in card.security:
+                _say(f"       ! {finding}")
+            for check in (card.lint, card.types):
+                if check is not None and check.new:
+                    _say(f"       ! {check.tool}: {'; '.join(map(str, check.new[:3]))}")
+    _say(f"\nstatus:    {run.status} ({run.stop_reason})")
+    _say(f"tokens:    {run.tokens_used}")
     for warning in run.warnings:
-        print(f"{banner}warning:{reset}   {warning}")
+        print(f"{banner}warning:{reset}   {display_safe(warning)}")
     if run.diff:
         top = run.selected
-        print(f"\nselected: candidate {top.candidate.index} ({top.candidate.source})\n")
+        _say(f"\nselected: candidate {top.candidate.index} ({top.candidate.source})\n")
         print(colorize_diff(run.diff, color), end="")
-        print("\nNothing was written to the repository; review the diff above.")
+        _say("\nNothing was written to the repository; review the diff above.")
     if run.run_dir:
-        print(f"artifacts: {run.run_dir}")
+        _say(f"artifacts: {run.run_dir}")
         if run.diff:
-            print(f"approve:   coderepair approve {run.run_id} --reviewer <name> [--candidate N]")
+            _say(f"approve:   coderepair approve {run.run_id} --reviewer <name> [--candidate N]")
 
 
 def cmd_repair(args: argparse.Namespace, settings: Settings) -> int:
@@ -418,27 +430,27 @@ def cmd_review(args: argparse.Namespace, settings: Settings) -> int:
     run_dir = resolve_run_dir(settings.runs_dir, args.run_id)
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     if args.json:
-        print(json.dumps(summary, indent=2))
+        _say(json.dumps(summary, indent=2))
         return 0
-    print(f"run {summary['run_id']}  task={summary.get('task_id')}  status={summary['status']}")
-    print(f"backend: {summary['backend']} ({summary['model']})  sandbox: {summary.get('sandbox')}")
+    _say(f"run {summary['run_id']}  task={summary.get('task_id')}  status={summary['status']}")
+    _say(f"backend: {summary['backend']} ({summary['model']})  sandbox: {summary.get('sandbox')}")
     repro = summary.get("reproduction_test")
     if repro:
-        print(f"reproduction test: {repro['status']} - {repro['detail']}")
+        _say(f"reproduction test: {repro['status']} - {repro['detail']}")
     for card in summary.get("candidates", []):
-        print(f"\n#{card['rank']} candidate {card['candidate']} ({card['source']})")
+        _say(f"\n#{card['rank']} candidate {card['candidate']} ({card['source']})")
         for reason in card["reasons"]:
-            print(f"   - {reason}")
+            _say(f"   - {reason}")
         for finding in card["security"]:
-            print(f"   ! {finding}")
+            _say(f"   ! {finding}")
         for risk in risks_of(card):
-            print(f"   risk: {risk}")
+            _say(f"   risk: {risk}")
         patch = run_dir / f"candidate-{card['candidate']}.patch"
         print(colorize_diff(patch.read_text(encoding="utf-8"), _use_color(args)), end="")
     approval = run_dir / "approval.json"
     if approval.exists():
         record = json.loads(approval.read_text(encoding="utf-8"))
-        print(
+        _say(
             f"\napproved: candidate {record['candidate']} by {record['reviewer']} "
             f"at {record['approved_at']}"
         )
@@ -473,7 +485,7 @@ def cmd_apply(args: argparse.Namespace, settings: Settings) -> int:
         run_dir,
         args.repo,
         allowed_roots=settings.allowed_roots,
-        protected_roots=(FIRST_PARTY_TASKS,),
+        protected_roots=(FIRST_PARTY_TASKS, PUBLIC_TASKS),
         limits=settings.limits,
     )
     print(f"wrote {len(result.written)} file(s) in {result.repo_root}:")
@@ -636,6 +648,16 @@ def cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _bounded(low: int, high: int):
+    def parse(value: str) -> int:
+        number = int(value)
+        if not low <= number <= high:
+            raise argparse.ArgumentTypeError(f"must be between {low} and {high}")
+        return number
+
+    return parse
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="coderepair", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -691,10 +713,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backend", choices=BACKEND_NAMES)
     p.add_argument("--script", type=Path)
     p.add_argument("--sandbox", choices=SANDBOX_NAMES)
-    p.add_argument("--max-attempts", type=int, default=4)
+    p.add_argument("--max-attempts", type=_bounded(1, 10), default=4)
     p.add_argument(
         "--candidates",
-        type=int,
+        type=_bounded(1, 5),
         default=1,
         help="aim for this many distinct passing candidates (extra samples after the loop)",
     )
@@ -730,7 +752,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backend", choices=BACKEND_NAMES)
     p.add_argument("--script", type=Path)
     p.add_argument("--sandbox", choices=SANDBOX_NAMES)
-    p.add_argument("--max-calls", type=int, default=3, help="model calls per agent per task")
+    p.add_argument(
+        "--max-calls", type=_bounded(1, 10), default=3, help="model calls per agent per task"
+    )
     p.add_argument("--out", help="results JSONL (resumable); summary and markdown go next to it")
     p.set_defaults(func=cmd_bench)
 

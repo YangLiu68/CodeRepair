@@ -6,8 +6,10 @@
   without importing or executing it. Repository configuration is ignored
   (``ruff --isolated``; ``mypy --config-file`` pointing at an empty file, so no
   mypy plugins from the repository can load), the environment is scrubbed and
-  both run with a timeout. If a tool is not installed the check is reported as
-  skipped, never as passed.
+  both run with a timeout. mypy is started with ``python -I`` so that a
+  ``mypy.py`` or ``typing_extensions.py`` in the copied repository (the working
+  directory) can never shadow the real modules. If a tool is not installed the
+  check is reported as skipped, never as passed.
 * **Security review** compares the AST of every changed file before and after
   the patch and flags newly introduced risky constructs (process execution,
   dynamic code, unsafe deserialisation, network access, ``shell=True``,
@@ -32,9 +34,10 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from .repo import RepoSnapshot
-from .security import redact_secrets
+from .security import HIDDEN_CHARS, redact_secrets
 
-_TOOL_TIMEOUT_S = 120
+_TOOL_TIMEOUT_S = 60
+
 _RUFF_RULES = "F,E9,B"
 
 
@@ -162,6 +165,7 @@ def _run_mypy(tree: Path, home: Path) -> list[Diagnostic]:
     proc = subprocess.run(  # noqa: S603 - fixed argv; mypy analyses, never imports, the code
         [
             sys.executable,
+            "-I",  # isolated: the copied repository (cwd) is not on sys.path
             "-m",
             "mypy",
             "--config-file",
@@ -374,6 +378,17 @@ def security_review(snapshot: RepoSnapshot, changed: Mapping[str, str]) -> list[
         old_text = snapshot.text(path) if path in snapshot.files else ""
         old_lines = set(old_text.splitlines())
         added = [line for line in new_text.splitlines() if line not in old_lines]
+        hidden = [line for line in added if HIDDEN_CHARS.search(line)]
+        if hidden:
+            findings.append(
+                SecurityFinding(
+                    path,
+                    "hidden-characters",
+                    "high",
+                    f"{len(hidden)} added line(s) contain control or bidirectional characters "
+                    "that can hide code from a reviewer",
+                )
+            )
         _, secrets = redact_secrets("\n".join(added))
         for redaction in secrets:
             findings.append(

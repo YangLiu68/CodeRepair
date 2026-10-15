@@ -129,20 +129,28 @@ issue-only tasks without a reproduction test; **failed** and **error** are what 
   denylist of process/network/dynamic-code APIs, and *fail* on the original code in the sandbox.
   A candidate on which it passes is `verified`.
 * **Static checks** run on the host but never import the code: `ruff --isolated` (pyflakes and
-  bugbear rules) and `mypy` with an empty config file (no repository plugins), before and after the
-  patch, reporting only newly introduced diagnostics. A missing tool is reported as `skipped`.
+  bugbear rules) and `mypy` with an empty config file (no repository plugins) started as
+  `python -I -m mypy`, so a `mypy.py` or `typing_extensions.py` in the copied repository cannot
+  shadow the real modules. Both run before and after the patch and report only newly introduced
+  diagnostics. A missing tool is reported as `skipped`, a failing one as `error`, never as a pass.
 * **Security review** compares the AST before and after the patch: new process execution, dynamic
   code, unsafe deserialisation, network, native code, `shell=True`, `verify=False`, destructive
-  filesystem calls, hard-coded secrets, and removed `raise` statements.
+  filesystem calls, hard-coded secrets, removed `raise` statements, and control or bidirectional
+  characters that can hide code from a reviewer ("Trojan Source"). The CLI and the dashboard show such
+  characters as visible `\uXXXX` escapes.
 * **Ranking** (highest first): visible tests all pass, no regressions, reproduction test verified,
   fewer high-severity findings, fewer new type errors, fewer new lint errors, fewer medium findings,
   smaller diff. Every scorecard lists its reasons.
 * **Approval:** `coderepair approve` refuses candidates with failing tests, regressions,
   high-severity findings or new lint/type errors unless `--acknowledge-risks` is given, and records
   reviewer, OS user, time, diff SHA-256 and the acknowledged risks in a `0600` file. Approvals are
-  final. `coderepair apply` re-ingests the repository under the path policy, re-applies the edits,
-  and writes only if the result is byte-identical to the approved diff; benchmark directories are
-  protected.
+  final. `coderepair apply` checks that the candidate patch and the reproduction test are the ones
+  approved (SHA-256), that the target is the repository the run was made on and still has the same
+  content hash, and that re-applying the edits yields the approved diff byte for byte. It then writes
+  through directory handles opened with `O_NOFOLLOW`, after a last check of each file's content, so a
+  symlinked directory or a file swapped in between cannot redirect the write. Both benchmark suites
+  are protected; protected and denied locations are compared by inode, not by spelling (macOS
+  file systems are case-insensitive).
 
 ## Trust boundaries
 
@@ -176,6 +184,9 @@ issue-only tasks without a reproduction test; **failed** and **error** are what 
 | T14 | Dependency supply chain | Few dependencies, `uv.lock`, CI with read-only token and no secrets; the runner bundle is copied from the locked environment and content-addressed | No automated vulnerability audit yet |
 | T15 | Harmful but test-passing patch | AST security review, lint/type deltas, risk flags, mandatory acknowledgement at approval | Review is heuristic; a human must read the diff |
 | T16 | Sandboxed code reads other processes' secrets | `(deny process-info*)` and a sysctl allowlist (Seatbelt); PID namespace (Docker); probe with a sentinel holding a canary in argv and env | Found and fixed during the M2 review: macOS's `(deny default)` does not cover process-info |
+| T17 | Reviewer deceived by how a diff is displayed (terminal escapes that erase lines, bidi overrides) | Control and bidi characters escaped in every CLI and dashboard view; `hidden-characters` security finding blocks approval without acknowledgement | Found and fixed during the M4–M7 review |
+| T18 | Static analysis tools tricked into running repository code on the host | `python -I -m mypy` in an isolated mode, empty config, scrubbed env; ruff `--isolated`; regression test plants `mypy.py`, `typing_extensions.py`, `sitecustomize.py` | Found and fixed during the M4–M7 review; tools themselves remain in the trusted base |
+| T19 | Write-back redirected (symlinked parent directory, file swapped after verification) or applied to the wrong repository | Directory-handle writes with `O_NOFOLLOW`, content re-check before write, approval bound to repository root, snapshot hash and reproduction-test hash | Found and fixed during the M4–M7 review |
 
 ## Data written to disk
 

@@ -3,7 +3,6 @@
 `bitcount` in `algo/bitcount.py` does not do what its docstring specifies for every input.
 
 - `bitcount(127)` does not return (it runs for more than 2 seconds); expected `7`.
-- `bitcount(128)` does not return (it runs for more than 2 seconds); expected `1`.
 
 The failing test `tests/test_bitcount.py::test_bitcount[case0]` reproduces it.
 

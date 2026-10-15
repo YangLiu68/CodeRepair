@@ -17,12 +17,12 @@ def _normalize(value):
 @pytest.mark.parametrize(
     "args, expected",
     [
-        pytest.param([100], [2, 2, 5, 5], id='case1'),
         pytest.param([101], [101], id='case2'),
         pytest.param([104], [2, 2, 2, 13], id='case3'),
         pytest.param([2], [2], id='case4'),
         pytest.param([3], [3], id='case5'),
         pytest.param([17], [17], id='case6'),
+        pytest.param([63], [3, 3, 7], id='case7'),
     ],
 )
 def test_hidden_get_factors(args, expected):

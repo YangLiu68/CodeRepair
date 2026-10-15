@@ -25,7 +25,8 @@ import getpass
 import hashlib
 import json
 import os
-import tempfile
+import secrets
+import stat
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -33,7 +34,7 @@ from pathlib import Path, PurePosixPath
 from .config import Limits
 from .patch import PatchProposal, apply_proposal
 from .repo import ingest_repository
-from .security import PolicyError
+from .security import PolicyError, same_or_inside
 from .trace import RUN_ID_RE
 
 APPROVAL_FILE = "approval.json"
@@ -59,6 +60,8 @@ class ApprovalRecord:
     acknowledged_risks: list[str]
     include_reproduction_test: bool
     note: str = ""
+    #: SHA-256 of the reproduction test code (when it is part of the approval)
+    reproduction_test_sha256: str = ""
 
 
 def sha256_text(text: str) -> str:
@@ -138,6 +141,7 @@ def approve(
         acknowledged_risks=risks,
         include_reproduction_test=include_reproduction_test,
         note=note,
+        reproduction_test_sha256=sha256_text(repro["code"]) if include_reproduction_test else "",
     )
     approved = diff
     if include_reproduction_test:
@@ -183,20 +187,41 @@ def apply_approved(
     protected_roots: tuple[Path, ...] = (),
     limits: Limits | None = None,
 ) -> ApplyResult:
-    """Write an approved candidate into ``repo`` after re-verifying everything."""
+    """Write an approved candidate into ``repo`` after re-verifying everything.
+
+    Checks, in order: the approval belongs to this run; the candidate patch and the
+    reproduction test are byte-identical to what was approved; ``repo`` passes the
+    ingestion policy, is not a protected location, is the repository the run was made
+    on, and still has the same content; re-applying the approved edits reproduces the
+    approved diff exactly. Files are then written through directory handles opened
+    without following symlinks, after a last check that each file is unchanged.
+    """
     record = load_approval(run_dir)
     summary = _load_summary(run_dir)
+    if summary["run_id"] != record.run_id:
+        raise ApprovalError("approval record does not belong to this run")
     diff = (run_dir / f"candidate-{record.candidate}.patch").read_text(encoding="utf-8")
     if sha256_text(diff) != record.diff_sha256:
         raise ApprovalError("the candidate patch changed after approval; refusing to apply")
-    if summary["run_id"] != record.run_id:
-        raise ApprovalError("approval record does not belong to this run")
+    repro = summary.get("reproduction_test") or {}
+    if record.include_reproduction_test and (
+        sha256_text(repro.get("code", "")) != record.reproduction_test_sha256
+    ):
+        raise ApprovalError("the reproduction test changed after approval; refusing to apply")
+
     snapshot = ingest_repository(repo, allowed_roots, limits or Limits())
     root = snapshot.root
     for protected in protected_roots:
-        real = protected.resolve()
-        if root == real or real in root.parents:
+        if same_or_inside(root, protected):
             raise PolicyError(f"refusing to write into a protected location: {root}")
+    if not same_or_inside(root, Path(record.repo_root)) or not same_or_inside(
+        Path(record.repo_root), root
+    ):
+        raise ApprovalError(
+            f"this approval is for {record.repo_root}, not {root}; re-run CodeRepair there"
+        )
+    if snapshot.content_hash != record.snapshot_hash:
+        raise ApprovalError("the repository changed since the run; re-run CodeRepair")
     proposal = PatchProposal.model_validate_json(
         (run_dir / f"candidate-{record.candidate}.json").read_text(encoding="utf-8")
     )
@@ -204,37 +229,103 @@ def apply_approved(
     if not result.ok:
         raise ApprovalError(f"approved edits no longer apply: {result.errors}")
     if result.diff != diff:
-        raise ApprovalError("the repository changed since the proposal was made; re-run CodeRepair")
-    writes = dict(result.changed_files)
+        raise ApprovalError("the repository changed since the run; re-run CodeRepair")
+
+    writes: dict[str, tuple[str | None, str]] = {
+        rel: (snapshot.text(rel), text) for rel, text in result.changed_files.items()
+    }
     if record.include_reproduction_test:
-        repro = summary["reproduction_test"]
-        rel = repro["path"]
-        if rel in snapshot.files or (root / rel).exists():
-            raise ApprovalError(f"{rel} already exists in the repository")
-        writes[rel] = repro["code"]
+        writes[repro["path"]] = (None, repro["code"])
     for rel in writes:
         parts = PurePosixPath(rel).parts
-        if not parts or ".." in parts or rel.startswith("/"):
+        if not parts or ".." in parts or rel.startswith("/") or any(p in ("", ".") for p in parts):
             raise ApprovalError(f"unsafe path {rel!r}")
-    written = []
-    for rel, text in sorted(writes.items()):
-        target = root.joinpath(*PurePosixPath(rel).parts)
-        if target.is_symlink():
-            raise ApprovalError(f"refusing to write through a symlink: {rel}")
-        _atomic_write(target, text)
-        written.append(rel)
+    root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        # First pass: every target is a regular file (or absent) reached without symlinks,
+        # with exactly the content the approval was made against.
+        for rel, (expected, _new) in sorted(writes.items()):
+            _check_target(root_fd, rel, expected)
+        written = []
+        for rel, (_expected, new) in sorted(writes.items()):
+            _write_target(root_fd, rel, new)
+            written.append(rel)
+    finally:
+        os.close(root_fd)
     return ApplyResult(root, written)
 
 
-def _atomic_write(target: Path, text: str) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    mode = target.stat().st_mode & 0o777 if target.exists() else 0o644
-    fd, tmp = tempfile.mkstemp(prefix=".coderepair-", dir=target.parent)
+def _open_parent(root_fd: int, rel: str, *, create: bool) -> int:
+    """Open the parent directory of ``rel`` component by component, never following links."""
+    fd = os.dup(root_fd)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
-            fh.write(text)
-        os.chmod(tmp, mode)
-        os.replace(tmp, target)
+        for part in PurePosixPath(rel).parts[:-1]:
+            try:
+                next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, 0o755, dir_fd=fd)
+                next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            except OSError as exc:  # ELOOP / ENOTDIR: a symlink or a file in the way
+                raise ApprovalError(f"refusing to write through {part!r} in {rel}: {exc}") from exc
+            os.close(fd)
+            fd = next_fd
     except BaseException:
-        Path(tmp).unlink(missing_ok=True)
+        os.close(fd)
         raise
+    return fd
+
+
+def _check_target(root_fd: int, rel: str, expected: str | None) -> None:
+    name = PurePosixPath(rel).name
+    try:
+        dir_fd = _open_parent(root_fd, rel, create=False)
+    except FileNotFoundError:
+        if expected is None:
+            return  # a new file in a new directory
+        raise ApprovalError(f"{rel} disappeared since the run") from None
+    try:
+        try:
+            info = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            if expected is None:
+                return
+            raise ApprovalError(f"{rel} disappeared since the run") from None
+        if expected is None:
+            raise ApprovalError(f"{rel} already exists in the repository")
+        if not stat.S_ISREG(info.st_mode):
+            raise ApprovalError(f"refusing to write {rel}: not a regular file")
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
+        with os.fdopen(fd, "r", encoding="utf-8", newline="") as fh:
+            if fh.read() != expected:
+                raise ApprovalError(f"{rel} changed since the run; re-run CodeRepair")
+    finally:
+        os.close(dir_fd)
+
+
+def _write_target(root_fd: int, rel: str, text: str) -> None:
+    name = PurePosixPath(rel).name
+    dir_fd = _open_parent(root_fd, rel, create=True)
+    try:
+        try:
+            mode = stat.S_IMODE(os.stat(name, dir_fd=dir_fd, follow_symlinks=False).st_mode)
+        except FileNotFoundError:
+            mode = 0o644
+        tmp = f".coderepair-{secrets.token_hex(6)}.tmp"
+        fd = os.open(
+            tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=dir_fd
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
+                fh.write(text)
+                os.fchmod(fh.fileno(), mode)
+            os.replace(tmp, name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        except BaseException:
+            try:
+                os.unlink(tmp, dir_fd=dir_fd)
+            except FileNotFoundError:
+                pass
+            raise
+    finally:
+        os.close(dir_fd)

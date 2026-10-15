@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of lis.",
+  "edits": [
+    {
+      "path": "algo/lis.py",
+      "old": "            longest = length + 1\n",
+      "new": "            longest = max(longest, length + 1)\n"
+    }
+  ]
+}

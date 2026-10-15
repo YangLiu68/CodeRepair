@@ -3,12 +3,12 @@ category = "algorithm"
 difficulty = "easy"
 issue_style = "observed vs expected outputs only (issue-only)"
 fail_to_pass = [
-    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case1]",
     "tests/test_hidden_get_factors.py::test_hidden_get_factors[case2]",
     "tests/test_hidden_get_factors.py::test_hidden_get_factors[case3]",
     "tests/test_hidden_get_factors.py::test_hidden_get_factors[case4]",
     "tests/test_hidden_get_factors.py::test_hidden_get_factors[case5]",
     "tests/test_hidden_get_factors.py::test_hidden_get_factors[case6]",
+    "tests/test_hidden_get_factors.py::test_hidden_get_factors[case7]",
 ]
 pass_to_pass = [
     "tests/test_get_factors.py::test_get_factors[case0]",

@@ -12,10 +12,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Stock CPython image; pytest is mounted read-only from the runner bundle.
+  CODEREPAIR_SANDBOX_IMAGE: python:3.12-slim
+
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -31,14 +35,24 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
-      - name: Unit and acceptance tests
-        run: uv run pytest
-      - name: Validate benchmark fixtures and manifest
-        run: uv run coderepair validate-fixtures
+      - name: Pull the sandbox image (the only network use; runs use --pull never)
+        run: docker pull "$CODEREPAIR_SANDBOX_IMAGE"
+      - name: Sandbox status
+        run: uv run coderepair sandbox status
+      - name: Abuse probes in the Docker sandbox
+        run: uv run coderepair sandbox selftest --sandbox docker
+      - name: Unit, security, sandbox and acceptance tests (Docker backend)
+        run: uv run pytest -rs
+      - name: Validate fixtures (host, trusted) and the public subset (sandboxed)
+        run: |
+          uv run coderepair validate-fixtures --suite fixtures
+          uv run coderepair validate-fixtures --suite public --sandbox docker
       - name: Retrieval metrics
         run: uv run coderepair eval-retrieval
-      - name: Oracle pipeline smoke (mock backend, no secrets)
+      - name: Harness smoke (oracle mock backend, no secrets)
         run: |
-          for task in $(uv run coderepair tasks --json | python -c "import json,sys; print(' '.join(t['id'] for t in json.load(sys.stdin)))"); do
-            uv run coderepair propose "$task" --backend oracle --no-save --no-color > /dev/null
-          done
+          uv run coderepair bench --backend oracle --sandbox docker \
+            --tasks t01_paginate_off_by_one t10_deep_merge_injection q06_gcd \
+            --out "$RUNNER_TEMP/bench/oracle.jsonl"
+          uv run coderepair repair t07_safe_join_prefix_escape --backend oracle \
+            --sandbox docker --evaluate --no-save --no-color

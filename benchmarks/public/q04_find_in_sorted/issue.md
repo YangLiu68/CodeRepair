@@ -3,7 +3,6 @@
 `find_in_sorted` in `algo/find_in_sorted.py` does not do what its docstring specifies for every input.
 
 - `find_in_sorted([1, 2, 3, 4, 6, 7, 8], 5)` raises `RecursionError`; expected `-1`.
-- `find_in_sorted([24, 26, 28, 50, 59], 101)` raises `RecursionError`; expected `-1`.
 
 The failing test `tests/test_find_in_sorted.py::test_find_in_sorted[case1]` reproduces it.
 

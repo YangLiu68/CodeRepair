@@ -1,146 +1,150 @@
 # Benchmark
 
-## Status
+Two task suites, hidden-test scoring in the sandbox, and a comparative benchmark of three repair
+agents under equal budgets (Milestone 5). Every number below was produced by a command in this
+repository; the raw rows are in `docs/results/`.
 
-Milestone 1 builds the benchmark fixtures and measures retrieval only. **No repair rate is
-reported yet**, because proposed patches are not executed until the Milestone 2 sandbox exists.
-The comparative benchmark (direct-patch vs retrieval-assisted vs test-feedback agents under equal
-budgets) is Milestone 5.
+## Task suites
 
-## Fixture tasks
+### First-party fixtures (`benchmarks/tasks/`, 10 tasks)
 
-Ten tiny first-party Python repositories, each with one seeded bug. All are original work written
-for this project on 2026-10-14 (see LICENSE_NOTES.md); none are derived from public bug datasets.
+Ten tiny Python repositories, each with one seeded bug, written for this project on 2026-10-14
+(see LICENSE_NOTES.md); none are derived from public bug datasets.
 
-| Task | Category | Difficulty | Issue style | Visible tests | Hidden tests | Fail-to-pass |
-|---|---|---|---|---|---|---|
-| `t01_paginate_off_by_one` | off-by-one | easy | behaviour description; names the public function | 5 | 2 | 3 (1 visible) |
-| `t02_mutable_default_tags` | mutable-default-argument | easy | user report with repro steps; no code identifiers | 6 | 2 | 2 (0 visible) |
-| `t03_interval_merge_unsorted` | algorithm-precondition | easy | failing test output; symptom in a caller of the buggy function | 5 | 2 | 3 (1 visible) |
-| `t04_duration_whitespace` | input-parsing | easy | traceback with an absolute path from the reporter's machine | 9 | 3 | 2 (0 visible) |
-| `t05_lru_recency` | state-management | easy | code repro plus failing test id | 6 | 2 | 3 (1 visible) |
-| `t06_coupon_threshold_multifile` | boundary-condition | medium | symptom reported in cart total; root cause in a different module | 9 | 2 | 3 (1 visible) |
-| `t07_safe_join_prefix_escape` | security-path-traversal | medium | security report (CWE-22) with a concrete exploit input | 6 | 3 | 2 (0 visible) |
-| `t08_money_half_up` | numeric-precision | medium | short report with failing test id | 6 | 4 | 4 (1 visible) |
-| `t09_slugify_accents` | unicode-handling | easy | user-visible symptom only; no identifiers or file names | 7 | 3 | 2 (0 visible) |
-| `t10_deep_merge_injection` | recursion | medium | config example plus failing test id; repo contains prompt-injection payloads | 6 | 3 | 4 (1 visible) |
+| Task | Category | Difficulty | Issue style | Fail-to-pass (visible) | Pass-to-pass |
+|---|---|---|---|---|---|
+| `t01_paginate_off_by_one` | off-by-one | easy | behaviour description; names the public function | 3 (1) | 4 |
+| `t02_mutable_default_tags` | mutable-default-argument | easy | user report with repro steps; no code identifiers | 2 (0) | 6 |
+| `t03_interval_merge_unsorted` | algorithm-precondition | easy | failing test output; symptom in a caller | 3 (1) | 4 |
+| `t04_duration_whitespace` | input-parsing | easy | traceback with an absolute path from the reporter's machine | 2 (0) | 10 |
+| `t05_lru_recency` | state-management | easy | code repro plus failing test id | 3 (1) | 5 |
+| `t06_coupon_threshold_multifile` | boundary-condition | medium | symptom in cart total; root cause in another module | 3 (1) | 8 |
+| `t07_safe_join_prefix_escape` | security-path-traversal | medium | security report (CWE-22) with an exploit input | 2 (0) | 7 |
+| `t08_money_half_up` | numeric-precision | medium | short report with failing test id | 4 (1) | 6 |
+| `t09_slugify_accents` | unicode-handling | easy | user-visible symptom only | 2 (0) | 8 |
+| `t10_deep_merge_injection` | recursion | medium | config example + failing test id; repo contains prompt-injection payloads | 4 (1) | 5 |
 
-Six tasks ship a visible failing test (as if the reporter contributed one); four are issue-only, so
-the bug is detectable only by hidden tests. That mix is deliberate: it lets M5 separate "made the
-visible test pass" from "resolved the issue".
+### Public subset (`benchmarks/public/`, 12 tasks, Milestone 6)
 
-### Layout and leakage controls
+Derived from [QuixBugs](https://github.com/jkoppel/QuixBugs) (MIT, commit `4257f44`) by
+`scripts/build_public_subset.py`. **Selection rule, fixed before any model was run on these tasks:**
+the first 12 programs in alphabetical order that are self-contained (no graph/node helpers), whose
+upstream correction passes every JSON test case, and whose bug fails at least two cases (one is
+quoted in the issue or given as the visible failing test, the others stay hidden). Skipped under
+this rule: `is_valid_parenthesization` (one failing case), `knapsack` (test session exceeded the
+sandbox memory limit), `levenshtein` (the correction exceeds the 2-second per-test limit on one case).
+
+**Revision (2026-10-15, before any model run on the subset):** the first build quoted up to two
+failing cases in each issue, and for two tasks those were also hidden fail-to-pass cases, so a
+hard-coded patch could have scored. Found by the second independent review; the builder now quotes
+only a case that is never hidden, `test_public.py` checks this for every task, and the subset was
+rebuilt: `is_valid_parenthesization` was replaced by `lis`, and the ids of the last four tasks
+shifted.
+
+For each program the builder runs every upstream test case in the sandbox against the buggy and the
+corrected version, then splits the cases: one failing case is the *reported example* (quoted in the
+issue, and on every second task also given as a visible failing test), up to two passing cases are
+visible, and the rest are hidden. The issue states the reported input, the expected output and what
+the buggy program actually did (a value, an exception type, or "does not return within 2 seconds");
+a per-test 2-second time limit in a protected `conftest.py` turns infinite loops into failures.
+
+| Task | Issue style | Fail-to-pass (visible) | Pass-to-pass |
+|---|---|---|---|
+| `q01_bitcount` | failing test provided | 7 (1) | 0 |
+| `q02_bucketsort` | failing test provided | 6 (1) | 1 |
+| `q03_find_first_in_sorted` | issue-only | 2 (0) | 4 |
+| `q04_find_in_sorted` | failing test provided | 2 (1) | 5 |
+| `q05_flatten` | issue-only | 5 (0) | 1 |
+| `q06_gcd` | failing test provided | 5 (1) | 1 |
+| `q07_get_factors` | issue-only | 6 (0) | 1 |
+| `q08_hanoi` | failing test provided | 7 (1) | 1 |
+| `q09_kheapsort` | issue-only | 2 (0) | 1 |
+| `q10_kth` | failing test provided | 4 (1) | 3 |
+| `q11_lcs_length` | issue-only | 6 (0) | 1 |
+| `q12_lis` | failing test provided | 4 (1) | 6 |
+
+### Layout and leakage controls (both suites)
 
 ```
-benchmarks/tasks/<id>/
+<suite>/<id>/
   issue.md        agent-visible
   repo/           agent-visible (the only directory the agent can read)
-  task.toml       harness-only: category, fail_to_pass ids, provenance, revisions
+  task.toml       harness-only: fail_to_pass, pass_to_pass, provenance, revisions
   solution.json   harness-only: gold edits (same schema as an agent proposal)
-  solution.patch  harness-only: gold diff, generated from solution.json
-  hidden_tests/   harness-only: copied into repo/tests/ at evaluation time
-benchmarks/manifest.json   SHA-256 of every task component
+  solution.patch  harness-only: gold diff
+  hidden_tests/   harness-only: added to repo/tests/ at scoring time
+<suite>/manifest.json   SHA-256 of every task component
 ```
 
-- The agent's ingestion root is `repo/`; the path policy rejects everything outside it.
-- `test_agent.py` checks, for every task, that no gold-added line and no hidden-test line (that is
-  not already visible) appears in the prompt. 9/10 tasks have gold lines to check; in t05 every
-  gold line already occurs in the visible repo, so there is nothing secret to leak.
-- The `oracle` backend replays `solution.json` to test the pipeline. Its output is labelled in the
-  CLI, API, traces and summaries, and it is excluded from every metric.
+- The agent's ingestion root is `repo/`; nothing else is readable to it, and the sandbox cannot read
+  the benchmark directories either (`host-files` probe).
+- Tests check every prompt, for every task in both suites, for gold-added lines and hidden-test
+  lines (`test_agent.py`, `test_public.py`). The repair loop only ever runs visible tests.
+- Public tasks contain no QuixBugs name, upstream harness or corrected code in `repo/` or the issue.
+- **Contamination:** QuixBugs has been public since 2017 and is very likely in the training data of
+  current models. Results on the public subset can reflect memorisation, which is why both suites are
+  reported separately and why the first-party fixtures exist.
+- The `oracle` backend replays gold solutions to test the pipeline; it is labelled everywhere and
+  excluded from every result table.
 
-### Validity criteria (checked by `coderepair validate-fixtures`)
+### Validity checks (`coderepair validate-fixtures --suite all`)
 
-For each task, on throwaway copies:
+For each task, on throwaway copies (public tasks always in the sandbox): visible fail-to-pass tests
+fail on the buggy repo and all others pass; with hidden tests exactly the fail-to-pass tests fail and
+exactly the pass-to-pass tests pass; with the gold edits every test passes; at least one hidden test
+detects the bug; the gold edits satisfy the agent's patch policy; `solution.patch` and the manifest
+are current. Current result: **22/22 valid**.
 
-1. Buggy repo, visible tests: the visible fail-to-pass tests fail and all others pass.
-2. Buggy repo + hidden tests: exactly the fail-to-pass tests fail.
-3. Gold repo + hidden tests: every test passes.
-4. At least one hidden test detects the bug.
-5. The gold edits satisfy the same patch policy as agent edits (no test edits, exact anchors, valid syntax).
-6. `solution.patch` and the manifest are current.
+**Fixture revision (2026-10-14):** the M1 smoke run produced `round(float(amount) * 100 + 0.5)` for
+t08, which is wrong (`"0.01"` → 2 cents) but passed every test. The hidden pass-to-pass test
+`test_hidden_exact_cent_values_are_unchanged` was added; `test_sandbox.py` now checks that this exact
+patch is rejected.
 
-Current result: **10/10 valid**, manifest up to date.
+## Milestone 5: comparative benchmark
 
-### Provenance and revisions
+### Method
 
-- Created 2026-10-14 by the project author. Each `task.toml` records the seeded bug.
-- **t08 revision (2026-10-14):** the local smoke run below produced `round(float(amount) * 100 + 0.5)`.
-  That patch is wrong (for example `"0.01"` → 2 cents) but would have passed every visible and hidden
-  test. I added the pass-to-pass hidden test `test_hidden_exact_cent_values_are_unchanged`. Hidden tests
-  are not visible to the agent, so prompts are unchanged by this revision.
+Three agents get the same issue, snapshot, patch policy and per-task budget (**at most 3 model
+calls**, 60k tokens, 900 s):
 
-## Retrieval (measured)
-
-`uv run coderepair eval-retrieval`, 10 tasks, ranking only non-test files:
-
-| Metric | CodeRepair retrieval | Random ordering (expected) |
-|---|---|---|
-| recall@1 | **0.90** | 0.26 |
-| recall@3 | **1.00** | 0.77 |
-| recall@5 | 1.00 | 1.00 |
-| MRR | 0.95 | — |
-
-The only miss at rank 1 is t06, where the issue describes the cart total and the bug is in
-`shop/coupons.py` (ranked 2nd behind `shop/cart.py`).
-
-**Interpretation:** each repo has only 3–5 non-test files, so recall@3 is close to trivial and
-recall@1 is the meaningful number. The retrieval weights (`retrieval.py`) were fixed before the
-first evaluation and not tuned per task. One general change was made after inspecting the first run:
-test files that import the top-ranked source module are now always eligible as context, even with no
-lexical overlap. This affects which *test* files are shown, not the source ranking above. The fixtures
-and the retriever have the same author, which biases results upward. M6 public tasks are the real test.
-
-## Smoke run with a local model (not a benchmark)
-
-One proposal per task with `qwen2.5:7b` through Ollama 0.14.2 on an Apple M4 (16 GB), temperature 0,
-JSON-schema-constrained output, single shot, no retries. Raw results:
-`docs/results/m1_smoke_ollama_qwen2.5-7b.json`. Reproduce with
-`uv run python scripts/smoke_run.py --backend ollama`.
-
-**Patches were not executed** (M1 has no sandbox), so "proposed" means only that a patch passed static
-validation. The verdicts below come from reading the diffs, not from running tests.
-
-| Task | Status | Diff vs gold | Manual reading of the patch |
+| Agent | Context | Uses tests? | Submits |
 |---|---|---|---|
-| t01 | rejected | — | `old` contained a literal `\n` instead of a newline (JSON escaping) |
-| t02 | rejected | — | `old` truncated at an embedded quote (JSON escaping) |
-| t03 | rejected | — | `old` paraphrased the code (a docstring line was dropped); also targeted the symptom, not `merge()` |
-| t04 | rejected | — | edit produced invalid Python |
-| t05 | proposed | different | wrong: changes `__contains__` (contradicts its docstring); existing tests would fail |
-| t06 | proposed | **identical** | correct |
-| t07 | proposed | different | no-op (`abspath` does not fix the prefix check); hidden tests would fail |
-| t08 | proposed | different | wrong `+ 0.5` rounding; exposed the weak test oracle fixed above |
-| t09 | proposed | different | wrong (`xmlcharrefreplace` produces `caf-233`); hidden tests would fail |
-| t10 | proposed | different | equivalent to gold; ignored the injection payload in the same file |
+| `direct` | issue + repository files in path order (no retrieval, no repository map) | no | first statically valid patch among up to 3 samples |
+| `retrieval` | issue + ranked, explained context (M1 prompt) | no | first statically valid patch among up to 3 samples |
+| `feedback` | retrieval context + M3 loop: sandboxed visible tests after each valid patch, failures fed back | visible tests only | top-ranked candidate (M4 scorecard) after up to 3 attempts |
 
-Summary: 6/10 passed static validation, 4/10 were rejected (3 anchor-format errors, 1 syntax error),
-1/10 identical to gold, and about 2/10 correct by inspection. LLM latency was 36–107 s per task
-(median 62 s, including a cold model load on the first task), with 0.9–1.6 k input and 77–141 output
-tokens. Three unrelated CPU-bound training jobs were running on the same machine at the time, so
-these latencies are pessimistic and not representative.
+Sample 0 is deterministic (temperature 0); further samples use temperature 0.7 with seeds 1 and 2.
+The submitted patch is scored with the hidden tests in the sandbox: **resolved** means every
+fail-to-pass and every pass-to-pass test passes. **pass@1** asks whether the agent's first model
+call alone would have resolved the task (for `retrieval` and `feedback` this is the same
+deterministic call, a built-in consistency check). Failure categories: `anchor-mismatch`,
+`syntax-error`, `invalid-output`, `no-edits`, `policy-violation` (no valid patch), `wrong-fix`
+(fail-to-pass tests still fail), `regression` (pass-to-pass broken), `resource-limit`.
 
-### Failure categories seen so far
+### Results
 
-| Category | Count | Planned response |
-|---|---|---|
-| Anchor not copied verbatim (escaping, paraphrase) | 3 | M3 retry loop feeds the validation error back to the model |
-| Invalid syntax after edit | 1 | M3 retry with the parser error |
-| Plausible but wrong fix | 4 | M2 sandboxed tests, M4 candidate ranking and hidden-test evaluation |
-| Weak test oracle in the benchmark | 1 | Fixed (t08); M4 adds regression-test generation |
+M5_RESULTS_PLACEHOLDER
+
+## Milestone 1 smoke run (historical, patches not executed)
+
+One proposal per fixture with `qwen2.5:7b`, before the sandbox existed: 6/10 passed static
+validation, 4/10 were rejected (3 anchor-format errors, 1 syntax error), 1/10 matched the gold diff
+and about 2/10 looked correct on reading. Raw results: `docs/results/m1_smoke_ollama_qwen2.5-7b.json`.
+These anchor errors motivated the loop's anchor hints.
 
 ## Reproducibility
 
-- Fixtures are pinned by `benchmarks/manifest.json`; the CI and test suite fail on any drift.
-- Every run writes its full prompt, raw response, parsed proposal, validation result and diff to
-  `runs/<run_id>/`.
-- Python dependencies are pinned in `uv.lock`. The smoke run records model, date and machine.
+- Tasks are pinned by manifests; CI and the test suite fail on any drift.
+- `coderepair bench` appends one JSON row per (task, agent) to a JSONL file and resumes an
+  interrupted run with the same configuration; `<name>.summary.json` and `<name>.md` are written
+  next to it. Every row records backend, model, calls, tokens, latency and the failure category.
+- Repair runs write prompts, responses, feedback, attempts, candidates and traces to `runs/<id>/`.
 
 ## Limitations
 
-- Ten tiny, single-language, single-bug repositories by one author: useful for plumbing, security
-  tests and failure analysis, not for claims about general repair ability.
-- Retrieval metrics are near ceiling because candidate sets are small.
-- Exact gold match is a poor correctness signal (t10 shows a correct non-identical patch). M2 replaces
-  it with test execution.
-- One sample per task, one local model; no variance estimates yet.
+- Small: 22 tasks, single-file or few-file Python repositories, one bug each. Useful for comparing
+  agent designs and failure modes, not for claims about general repair ability.
+- One local 3B model, one sample per configuration, no confidence intervals. Differences of one or
+  two tasks are within noise.
+- The public subset is likely memorised by large models (see Contamination).
+- Retrieval metrics are near ceiling on the fixtures because candidate sets are small.

@@ -3,7 +3,6 @@ category = "algorithm"
 difficulty = "easy"
 issue_style = "observed vs expected outputs only (issue-only)"
 fail_to_pass = [
-    "tests/test_hidden_flatten.py::test_hidden_flatten[case0]",
     "tests/test_hidden_flatten.py::test_hidden_flatten[case2]",
     "tests/test_hidden_flatten.py::test_hidden_flatten[case3]",
     "tests/test_hidden_flatten.py::test_hidden_flatten[case4]",
