@@ -21,7 +21,7 @@ from __future__ import annotations
 import difflib
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .agent import (
@@ -71,6 +71,11 @@ class RepairBudget:
     candidates: int = 1
     #: Milestone 4: ask the model for a reproduction test and use it to rank candidates.
     repro_test: bool = False
+    #: Retries after the first attempt sample (``sample_index`` = attempt - 1, i.e.
+    #: temperature > 0 on backends that support it) instead of repeating the
+    #: deterministic request with feedback. The benchmark's ``feedback-sampled``
+    #: ablation uses it to separate the effect of feedback from that of sampling.
+    sample_retries: bool = False
 
 
 MAX_SCORED_CANDIDATES = 6
@@ -445,6 +450,8 @@ def repair(
             break
         request = request_with_feedback(context.bundle.request, run.attempts)
         index = len(run.attempts) + 1
+        if budget.sample_retries and index > 1:
+            request = replace(request, sample_index=index - 1)
         trace.add("attempt_start", attempt=index, prompt_chars=len(request.user))
         if index > 1:
             trace.add("feedback_prompt", attempt=index, user=request.user)
@@ -552,7 +559,8 @@ def _review(
             policy,
             trace,
             count=extra,
-            start_index=1,
+            # Seeds not already used by sampled retries.
+            start_index=len(run.attempts) if budget.sample_retries else 1,
             budget_left=budget_left,
         )
         pool += [(f"sample {i}", s, None) for i, s in enumerate(run.samples, start=1)]

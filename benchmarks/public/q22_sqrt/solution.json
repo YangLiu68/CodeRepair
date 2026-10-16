@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of sqrt.",
+  "edits": [
+    {
+      "path": "algo/sqrt.py",
+      "old": "    while abs(x - approx) > epsilon:\n",
+      "new": "    while abs(x - approx ** 2) > epsilon:\n"
+    }
+  ]
+}

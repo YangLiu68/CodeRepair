@@ -28,7 +28,7 @@ def test_untrusted_host_header_is_rejected(client):
 
 def test_task_list_and_detail_expose_only_agent_visible_data(client):
     tasks = client.get("/api/tasks").json()
-    assert len(tasks) == 22
+    assert len(tasks) == 35
     assert {t["id"][0] for t in tasks} == {"t", "q"}
     detail = client.get(f"/api/tasks/{TASK}")
     assert detail.status_code == 200

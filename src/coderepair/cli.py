@@ -11,7 +11,15 @@ from pathlib import Path
 from .agent import STATUS_PROPOSED, ProposalRun, propose_patch
 from .approval import ApprovalError, apply_approved, approve, resolve_run_dir, risks_of
 from .backends import BACKEND_NAMES, make_backend
-from .benchmark.compare import AGENTS, BenchBudget, render_markdown, run_benchmark
+from .benchmark.compare import (
+    AGENTS,
+    ALL_AGENTS,
+    BenchBudget,
+    render_markdown,
+    render_report,
+    run_benchmark,
+    task_hash,
+)
 from .benchmark.evaluate import evaluate_patch
 from .benchmark.manifest import check_manifest, write_manifest, write_solution_patch
 from .benchmark.retrieval_eval import evaluate_retrieval
@@ -369,9 +377,9 @@ def cmd_repair(args: argparse.Namespace, settings: Settings) -> int:
 def cmd_bench(args: argparse.Namespace, settings: Settings) -> int:
     """Milestone 5: run the comparative benchmark and write JSONL + summary + markdown."""
     agents = tuple(a.strip() for a in args.agents.split(",") if a.strip())
-    unknown = [a for a in agents if a not in AGENTS]
+    unknown = [a for a in agents if a not in ALL_AGENTS]
     if unknown:
-        print(f"error: unknown agent(s) {unknown}; choose from {AGENTS}", file=sys.stderr)
+        print(f"error: unknown agent(s) {unknown}; choose from {ALL_AGENTS}", file=sys.stderr)
         return 2
     chosen = list(SUITES) if args.suite == "all" else [args.suite]
     tasks = []
@@ -423,6 +431,25 @@ def cmd_bench(args: argparse.Namespace, settings: Settings) -> int:
     print()
     print(markdown)
     print(f"rows: {out}\nsummary: {summary_path}")
+    return 0
+
+
+def cmd_bench_report(args: argparse.Namespace, settings: Settings) -> int:
+    """Confidence intervals and paired tests for one or more benchmark result files."""
+    missing = [p for p in args.files if not p.is_file()]
+    if len({p.resolve() for p in args.files}) != len(args.files):
+        print("error: a results file is listed twice", file=sys.stderr)
+        return 2
+    if missing:
+        print(f"error: not found: {', '.join(map(str, missing))}", file=sys.stderr)
+        return 2
+    current = {
+        task.id: task_hash(task)
+        for directory, _ in SUITES.values()
+        if directory.is_dir()
+        for task in list_tasks(directory)
+    }
+    print(render_report(args.files, current))
     return 0
 
 
@@ -748,7 +775,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("bench", help="comparative benchmark: direct vs retrieval vs feedback")
     p.add_argument("--suite", choices=("fixtures", "public", "all"), default="fixtures")
     p.add_argument("--tasks", nargs="*")
-    p.add_argument("--agents", default=",".join(AGENTS))
+    p.add_argument(
+        "--agents",
+        default=",".join(AGENTS),
+        help=f"comma-separated, from {', '.join(ALL_AGENTS)} (default: {', '.join(AGENTS)})",
+    )
     p.add_argument("--backend", choices=BACKEND_NAMES)
     p.add_argument("--script", type=Path)
     p.add_argument("--sandbox", choices=SANDBOX_NAMES)
@@ -757,6 +788,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--out", help="results JSONL (resumable); summary and markdown go next to it")
     p.set_defaults(func=cmd_bench)
+
+    p = sub.add_parser(
+        "bench-report", help="confidence intervals and paired tests for benchmark results"
+    )
+    p.add_argument("files", nargs="+", type=Path, help="results JSONL files from `bench`")
+    p.set_defaults(func=cmd_bench_report)
 
     p = sub.add_parser("review", help="show a repair run's ranked candidates and scorecards")
     p.add_argument("run_id")

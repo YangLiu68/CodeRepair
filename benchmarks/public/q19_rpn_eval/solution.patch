@@ -1,0 +1,12 @@
+diff --git a/algo/rpn_eval.py b/algo/rpn_eval.py
+--- a/algo/rpn_eval.py
++++ b/algo/rpn_eval.py
+@@ -17,7 +17,7 @@
+             a = stack.pop()
+             b = stack.pop()
+             stack.append(
+-                op(token, a, b)
++                op(token, b, a)
+             )
+ 
+     return stack.pop()

@@ -10,7 +10,7 @@ from coderepair.cli import colorize_diff, main
 def test_tasks(capsys):
     assert main(["tasks"]) == 0
     out = capsys.readouterr().out
-    assert out.count("\n") == 22  # 10 first-party fixtures + 12 public tasks
+    assert out.count("\n") == 35  # 10 first-party fixtures + 25 public tasks
     assert "t10_deep_merge_injection" in out and "q12_" in out
 
 
@@ -123,3 +123,34 @@ def test_colorize_diff():
     assert colorize_diff(diff, False) == diff
     colored = colorize_diff(diff, True)
     assert "\033[32m+b" in colored and "\033[31m-a" in colored
+
+
+def test_bench_report_uses_current_rows_and_rejects_duplicates(tmp_path, capsys):
+    from dataclasses import asdict
+
+    from coderepair.benchmark.compare import BenchRow, task_hash
+    from coderepair.benchmark.tasks import load_any_task
+    from coderepair.cli import FIRST_PARTY_TASKS
+
+    current = task_hash(load_any_task((FIRST_PARTY_TASKS,), "t01_paginate_off_by_one"))
+    rows = []
+    for agent, resolved, digest in [
+        ("direct", False, current),
+        ("feedback", True, current),
+        ("retrieval", True, "outdated"),
+    ]:
+        rows.append(BenchRow(
+            suite="fixtures", task_id="t01_paginate_off_by_one", agent=agent, backend="ollama",
+            model="m", status="resolved" if resolved else "unresolved", resolved=resolved,
+            pass_at_1=resolved, failure="" if resolved else "wrong-fix", calls=1,
+            input_tokens=1, output_tokens=1, llm_latency_s=0.0, wall_s=0.0, f2p_passing="",
+            p2p_broken=0, diff_lines=0, task_hash=digest,
+        ))  # fmt: skip
+    path = tmp_path / "r.jsonl"
+    path.write_text("".join(json.dumps({"config": "c", "row": asdict(r)}) + "\n" for r in rows))
+    assert main(["bench-report", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "| feedback | 1/1 |" in out and "| direct | 0/1 |" in out
+    assert "retrieval" not in out.split("left out")[1]
+    assert main(["bench-report", str(path), str(path)]) == 2
+    assert main(["bench-report", str(tmp_path / "missing.jsonl")]) == 2

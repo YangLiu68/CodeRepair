@@ -17,7 +17,7 @@ only at the reserved `attacker.example` domain.
 
 ### Public subset (`benchmarks/public/`, Milestone 6)
 
-Twelve tasks are derived from **QuixBugs** (Lin, Koppel, Chen and Solar-Lezama, 2017),
+Twenty-five tasks are derived from **QuixBugs** (Lin, Koppel, Chen and Solar-Lezama, 2017),
 <https://github.com/jkoppel/QuixBugs>, commit `4257f44b0ff1181dedaedee6a447e133219fcebf`, retrieved
 2026-10-15.
 

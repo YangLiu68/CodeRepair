@@ -1,0 +1,15 @@
+{
+  "summary": "Upstream correction of possible_change.",
+  "edits": [
+    {
+      "path": "algo/possible_change.py",
+      "old": "# Python 3\n",
+      "new": ""
+    },
+    {
+      "path": "algo/possible_change.py",
+      "old": "    if total < 0:\n",
+      "new": "    if total < 0 or not coins:\n"
+    }
+  ]
+}

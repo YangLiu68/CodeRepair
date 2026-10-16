@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of max_sublist_sum.",
+  "edits": [
+    {
+      "path": "algo/max_sublist_sum.py",
+      "old": "        max_ending_here = max_ending_here + x\n",
+      "new": "        max_ending_here = max(0, max_ending_here + x)\n"
+    }
+  ]
+}

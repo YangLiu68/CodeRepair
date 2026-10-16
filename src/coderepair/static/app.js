@@ -316,13 +316,23 @@ async function loadBenchmarks() {
     if (meta.is_mock) box.appendChild(el("p", "banner", "Mock backend: checks the harness, not a result."));
     box.appendChild(el("p", "muted",
       `${meta.date} · budget ${JSON.stringify(meta.budget)} · sandbox ${meta.sandbox}`));
+    const pct = x => `${Math.round(100 * x)}%`;
     const rows = Object.entries(result.summary || {}).map(([agent, s]) => [
-      agent, `${s.resolved}/${s.tasks}`, `${s.pass_at_1}/${s.tasks}`, `${s.valid_patch}/${s.tasks}`,
+      agent,
+      `${s.resolved}/${s.tasks}` + (s.resolve_ci95 ? ` (95% CI ${pct(s.resolve_ci95[0])}–${pct(s.resolve_ci95[1])})` : ""),
+      `${s.pass_at_1}/${s.tasks}`, `${s.valid_patch}/${s.tasks}`,
       String(s.regressions), String(s.mean_calls), String(s.mean_tokens), `${s.median_wall_s}s`,
       Object.entries(s.failures || {}).map(([k, v]) => `${k} ${v}`).join(", "),
     ]);
     box.appendChild(table(["Agent", "Resolved", "pass@1", "Valid patch", "Regressions",
       "Mean calls", "Mean tokens", "Median wall", "Failures"], rows));
+    if ((result.paired || []).length) {
+      box.appendChild(el("p", "muted",
+        "Paired on the same tasks: only A / only B count the tasks exactly one agent resolved (exact McNemar p)."));
+      box.appendChild(table(["A vs B", "Tasks", "Only A", "Only B", "p"], result.paired.map(c => [
+        `${c.a} vs ${c.b}`, String(c.tasks), String(c.only_a), String(c.only_b), Number(c.p_value) < 0.001 ? "<0.001" : Number(c.p_value).toFixed(3),
+      ])));
+    }
     const more = el("button", "link", "Per-task results");
     more.addEventListener("click", async () => {
       const data = await api(`/api/benchmarks/${encodeURIComponent(result.name)}`);

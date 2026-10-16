@@ -1,0 +1,226 @@
+{
+  "meta": {
+    "kind": "comparative benchmark",
+    "backend": "ollama",
+    "model": "qwen2.5-coder:3b",
+    "is_mock": false,
+    "budget": {
+      "max_calls": 3,
+      "max_tokens": 60000,
+      "max_wall_s": 900.0
+    },
+    "agents": [
+      "direct",
+      "retrieval",
+      "feedback",
+      "feedback-sampled"
+    ],
+    "sandbox": "seatbelt",
+    "sandbox_limits": {
+      "wall_timeout_s": 60.0,
+      "cpu_seconds": 60,
+      "memory_mb": 512,
+      "tmp_mb": 64,
+      "disk_write_mb": 256,
+      "max_file_mb": 32,
+      "max_open_files": 256,
+      "max_processes": 64,
+      "output_bytes": 65536,
+      "output_hard_cap_bytes": 8000000
+    },
+    "date": "2026-10-16T03:00:26+00:00",
+    "machine": "Darwin arm64 / Python 3.12.10"
+  },
+  "config": "c10754393838",
+  "summary": {
+    "direct": {
+      "tasks": 35,
+      "resolved": 3,
+      "resolve_rate": 0.086,
+      "resolve_ci95": [
+        0.03,
+        0.224
+      ],
+      "pass_at_1": 2,
+      "valid_patch": 32,
+      "regressions": 8,
+      "mean_calls": 1.43,
+      "mean_tokens": 1899,
+      "median_llm_latency_s": 13.0,
+      "median_wall_s": 14.5,
+      "failures": {
+        "wrong-fix": 26,
+        "syntax-error": 1,
+        "anchor-mismatch": 2,
+        "regression": 3
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 2
+        },
+        "public": {
+          "tasks": 25,
+          "resolved": 1
+        }
+      }
+    },
+    "retrieval": {
+      "tasks": 35,
+      "resolved": 7,
+      "resolve_rate": 0.2,
+      "resolve_ci95": [
+        0.1,
+        0.359
+      ],
+      "pass_at_1": 5,
+      "valid_patch": 33,
+      "regressions": 9,
+      "mean_calls": 1.37,
+      "mean_tokens": 1932,
+      "median_llm_latency_s": 11.9,
+      "median_wall_s": 13.3,
+      "failures": {
+        "wrong-fix": 24,
+        "syntax-error": 1,
+        "anchor-mismatch": 1,
+        "regression": 2
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 3
+        },
+        "public": {
+          "tasks": 25,
+          "resolved": 4
+        }
+      }
+    },
+    "feedback": {
+      "tasks": 35,
+      "resolved": 5,
+      "resolve_rate": 0.143,
+      "resolve_ci95": [
+        0.063,
+        0.294
+      ],
+      "pass_at_1": 5,
+      "valid_patch": 33,
+      "regressions": 8,
+      "mean_calls": 2.43,
+      "mean_tokens": 4248,
+      "median_llm_latency_s": 25.0,
+      "median_wall_s": 31.4,
+      "failures": {
+        "wrong-fix": 26,
+        "anchor-mismatch": 2,
+        "regression": 2
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 1
+        },
+        "public": {
+          "tasks": 25,
+          "resolved": 4
+        }
+      }
+    },
+    "feedback-sampled": {
+      "tasks": 35,
+      "resolved": 5,
+      "resolve_rate": 0.143,
+      "resolve_ci95": [
+        0.063,
+        0.294
+      ],
+      "pass_at_1": 5,
+      "valid_patch": 29,
+      "regressions": 7,
+      "mean_calls": 2.49,
+      "mean_tokens": 4319,
+      "median_llm_latency_s": 27.3,
+      "median_wall_s": 32.3,
+      "failures": {
+        "wrong-fix": 22,
+        "anchor-mismatch": 5,
+        "syntax-error": 1,
+        "regression": 2
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 1
+        },
+        "public": {
+          "tasks": 25,
+          "resolved": 4
+        }
+      }
+    }
+  },
+  "paired": [
+    {
+      "a": "direct",
+      "b": "retrieval",
+      "tasks": 35,
+      "both": 2,
+      "only_a": 1,
+      "only_b": 5,
+      "neither": 27,
+      "p_value": 0.2188
+    },
+    {
+      "a": "direct",
+      "b": "feedback",
+      "tasks": 35,
+      "both": 2,
+      "only_a": 1,
+      "only_b": 3,
+      "neither": 29,
+      "p_value": 0.625
+    },
+    {
+      "a": "direct",
+      "b": "feedback-sampled",
+      "tasks": 35,
+      "both": 2,
+      "only_a": 1,
+      "only_b": 3,
+      "neither": 29,
+      "p_value": 0.625
+    },
+    {
+      "a": "retrieval",
+      "b": "feedback",
+      "tasks": 35,
+      "both": 5,
+      "only_a": 2,
+      "only_b": 0,
+      "neither": 28,
+      "p_value": 0.5
+    },
+    {
+      "a": "retrieval",
+      "b": "feedback-sampled",
+      "tasks": 35,
+      "both": 5,
+      "only_a": 2,
+      "only_b": 0,
+      "neither": 28,
+      "p_value": 0.5
+    },
+    {
+      "a": "feedback",
+      "b": "feedback-sampled",
+      "tasks": 35,
+      "both": 5,
+      "only_a": 0,
+      "only_b": 0,
+      "neither": 30,
+      "p_value": 1.0
+    }
+  ]
+}

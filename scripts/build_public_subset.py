@@ -17,10 +17,10 @@ Leakage controls: the corrected program, the upstream test files and any
 QuixBugs naming are never placed in ``repo/`` or the issue; the issue quotes
 only a failing case that is not among the hidden tests; outputs observed from
 running code are produced in the sandbox; the checkout is read as text and never
-imported on the host. Selection rule (fixed before any model was run on these
-tasks): the first ``--count`` programs in alphabetical order, among those that
-are self-contained (no graph/node helpers), whose upstream correction passes
-every case, and whose bug fails at least two cases.
+imported on the host. Selection rule: every program (or the first ``--count``
+in alphabetical order) that is self-contained (no graph/node helpers), whose
+upstream correction passes every case, whose bug fails at least two cases, and
+whose outcomes are identical in two runs. The rule never looks at model results.
 
 Usage:
     uv run python scripts/build_public_subset.py --source /path/to/QuixBugs --commit <sha>
@@ -61,6 +61,29 @@ NEEDS_HELPERS = {
     "node",
 }
 APPROX = {"sqrt"}  # compared with pytest.approx(abs=epsilon), as upstream does
+#: Programs whose specification allows more than one correct output. Their tests check
+#: the specified property instead of the one output the upstream correction happens to give.
+SPEC_CHECKS = {
+    # "If multiple subsequences of equal length exist, either is OK."
+    "longest_common_subsequence": (
+        """def _is_subsequence(small, big):
+    rest = iter(big)
+    return all(ch in rest for ch in small)
+""",
+        "assert isinstance(result, str) and len(result) == len(expected)\n"
+        "    assert _is_subsequence(result, args[0]) and _is_subsequence(result, args[1])",
+    ),
+    # "A list of lists, each representing a different subset": no order is specified.
+    "powerset": (
+        """def _subsets(value):
+    return sorted(sorted(repr(v) for v in subset) for subset in value)
+""",
+        "assert _subsets(result) == _subsets(expected)",
+    ),
+    # "A list of all length-k ascending sequences": each sequence is ordered, the list is not.
+    "subsequences": ("", "assert sorted(_normalize(result)) == sorted(_normalize(expected))"),
+}
+GOLD_MAX_SECONDS = 0.5  # the correction must run every case well inside the 2-second limit
 MAX_HIDDEN_PASSING = 4
 MAX_HIDDEN_FAILING = 6
 
@@ -70,13 +93,17 @@ import signal
 import pytest
 
 
-@pytest.fixture(autouse=True)
-def _time_limit():
-    """Fail (instead of hang) when a call does not return within 2 seconds."""
+def _expired(signum, frame):
+    raise TimeoutError("test exceeded its 2 second time limit")
 
-    def _expired(signum, frame):
-        raise TimeoutError("test exceeded its 2 second time limit")
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_pyfunc_call(pyfuncitem):
+    """Fail (instead of hang) when a test function does not return within 2 seconds.
+
+    The timer covers only the test function itself: it is disarmed before pytest's
+    own teardown and reporting, so a long traceback is never interrupted mid-report.
+    """
     previous = signal.signal(signal.SIGALRM, _expired)
     signal.setitimer(signal.ITIMER_REAL, 2.0)
     try:
@@ -112,6 +139,8 @@ def _normalize(value):
 OBSERVE = """\
 import json
 import os
+import re
+import time
 
 import pytest
 
@@ -123,13 +152,21 @@ CASES = {cases!r}
 @pytest.mark.parametrize("index", range(len(CASES)))
 def test_observe(index):
     args, _expected = CASES[index]
+    started = time.perf_counter()
     try:
         value = {name}(*args)
         if hasattr(value, "__next__"):
             value = list(value)
-        record = {{"case": index, "repr": repr(value)[:300]}}
+        # Object addresses differ between runs; keep the issue text reproducible.
+        text = re.sub(r" at 0x[0-9a-fA-F]+", " at 0x...", repr(value))
+        if len(text) > 300:  # keep both ends: the difference is often at the end
+            text = text[:150] + " ... " + text[-150:]
+            record = {{"case": index, "repr": text, "shortened": True}}
+        else:
+            record = {{"case": index, "repr": text}}
     except BaseException as exc:  # noqa: BLE001 - recording what the buggy code does
         record = {{"case": index, "error": type(exc).__name__}}
+    record["seconds"] = round(time.perf_counter() - started, 3)
     with open(os.path.join(os.environ["TMPDIR"], "observed.jsonl"), "a") as fh:
         fh.write(json.dumps(record) + "\\n")
 """
@@ -137,7 +174,8 @@ def test_observe(index):
 
 def test_module(name: str, cases: list[tuple[int, list]], *, hidden: bool) -> str:
     func = f"test_hidden_{name}" if hidden else f"test_{name}"
-    compare = (
+    helper, check = SPEC_CHECKS.get(name, ("", ""))
+    compare = check or (
         "assert result == pytest.approx(expected, abs=args[-1])"
         if name in APPROX
         else "assert _normalize(result) == _normalize(expected)"
@@ -150,6 +188,7 @@ def test_module(name: str, cases: list[tuple[int, list]], *, hidden: bool) -> st
         "import pytest\n\n"
         f"from algo.{name} import {name}\n\n\n"
         + (NORMALIZE + "\n\n" if name not in APPROX else "")
+        + (helper + "\n\n" if helper else "")
         + "@pytest.mark.parametrize(\n"
         + '    "args, expected",\n'
         + "    [\n"
@@ -225,15 +264,26 @@ def run_cases(sandbox, repo_files: dict[str, str], name: str, cases, overlay=Non
                     observed[int(record["case"])] = record
         finally:
             run_dir.cleanup()
-    if result.results is None:
+    if not result.completed:
         reason = result.limit_exceeded or "; ".join(result.problems) or "no results"
         raise SessionIncomplete(f"test session did not complete ({reason})")
+    missing = [
+        i
+        for i, _ in cases
+        if f"tests/test_{name}.py::test_{name}[case{i}]" not in result.results.outcomes
+    ]
+    if missing:
+        raise SessionIncomplete(f"no outcome for case(s) {missing}")
     outcomes = {}
     for index, _ in cases:
         outcomes[index] = result.results.outcomes.get(
             f"tests/test_{name}.py::test_{name}[case{index}]"
         )
     return outcomes, observed
+
+
+def _untimed(observed: dict) -> dict:
+    return {i: {k: v for k, v in r.items() if k != "seconds"} for i, r in observed.items()}
 
 
 def issue_text(name: str, reported: list[tuple[int, list]], observed: dict, visible_failing):
@@ -250,8 +300,10 @@ def issue_text(name: str, reported: list[tuple[int, list]], observed: dict, visi
             got = "does not return (it runs for more than 2 seconds)"
         elif "error" in record:
             got = f"raises `{record['error']}`"
+        elif record.get("shortened"):
+            got = f"returns `{record['repr']}` (shortened; the middle is omitted)"
         else:
-            got = f"returns `{record.get('repr', '?')}`"
+            got = f"returns `{record['repr']}`"
         lines.append(f"- `{call}` {got}; expected `{json.dumps(expected)}`.")
     if visible_failing is not None:
         lines += ["", f"The failing test `{visible_failing}` reproduces it."]
@@ -310,11 +362,22 @@ def build(source: Path, commit: str, count: int, sandbox_name: str) -> int:
             continue
         try:
             buggy_outcomes, observed = run_cases(sandbox, repo_files, name, cases)
-            gold_outcomes, _ = run_cases(
+            gold_outcomes, gold_observed = run_cases(
                 sandbox, repo_files, name, cases, overlay=gold.changed_files
             )
+            # Outcomes must not depend on timing or load: a second run has to agree.
+            again, observed_again = run_cases(sandbox, repo_files, name, cases)
         except SessionIncomplete as exc:
             report.append(f"skip {name}: {exc}")
+            continue
+        if again != buggy_outcomes or _untimed(observed_again) != _untimed(observed):
+            report.append(f"skip {name}: outcomes differ between two runs of the buggy code")
+            continue
+        slow = [i for i, r in gold_observed.items() if r.get("seconds", 0) > GOLD_MAX_SECONDS]
+        if slow:
+            report.append(
+                f"skip {name}: the correction needs more than {GOLD_MAX_SECONDS}s on case(s) {slow}"
+            )
             continue
         valid = [i for i, _ in cases if gold_outcomes.get(i) == "passed"]
         if len(valid) < len(cases):
@@ -326,6 +389,9 @@ def build(source: Path, commit: str, count: int, sandbox_name: str) -> int:
             # One failing case is needed for the issue (or the visible test) and at least
             # one other must stay hidden, so the issue never quotes a hidden test.
             report.append(f"skip {name}: the bug fails fewer than two test cases")
+            continue
+        if failing[0][0] not in observed:
+            report.append(f"skip {name}: no observation for the reported case")
             continue
         built += 1
         task_id = f"q{built:02d}_{name}"
@@ -423,7 +489,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--source", type=Path, required=True, help="QuixBugs checkout")
     parser.add_argument("--commit", required=True, help="commit SHA of the checkout")
-    parser.add_argument("--count", type=int, default=12)
+    parser.add_argument("--count", type=int, default=100, help="at most this many tasks")
     parser.add_argument("--sandbox", default="auto")
     args = parser.parse_args()
     if not (args.source / "LICENSE").is_file():

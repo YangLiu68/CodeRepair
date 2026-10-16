@@ -13,7 +13,7 @@ transparent, reproducible agent evaluation.
 |---|---|---|
 | Hardware | Apple M4, 10 cores, 16 GB RAM, ~27 GB free disk | Fine for fixtures and a 7B local model; no GPU work planned |
 | Python | 3.12.10 (miniforge), 3.13.1; `uv` 0.9.2 | Project targets Python ≥ 3.11, dev env on 3.12, CI on 3.11–3.13 |
-| Container runtime | **None** (no docker/podman/colima) | M2 ships a Docker backend (verified by command-line tests here, run for real in CI) and a macOS Seatbelt backend as the clearly labelled local fallback. There is still no unsandboxed fallback |
+| Container runtime | **None** at the start (no docker/podman/colima); Colima installed later the same day | M2 ships a Docker backend and a macOS Seatbelt backend as the clearly labelled local fallback. There is still no unsandboxed fallback. The Docker backend was first run for real under Colima on 2026-10-15 |
 | LLM credentials | No API keys in the environment | Tests/CI use deterministic mock backends; real backends are optional |
 | Local LLM | Ollama with `qwen2.5:7b` and `qwen2.5:3b` | Offline real-model runs; the shared machine's resource manager asks for ≤3B models, so M5 uses `qwen2.5:3b` |
 | Git | Parent directory (`$HOME`) is itself a git repo | CodeRepair has its own `git init`; the tool never runs git on untrusted repos in M1 |
@@ -60,7 +60,7 @@ Fixture-execution exception (documented): `validate-fixtures` runs pytest on **f
 Disposable container per run: `--network none`, non-root user, CPU/memory/pids/time limits, read-only root filesystem and repo mount, a writable tmpfs workspace, no host env/secrets, no Docker socket. Results parsed as untrusted with size limits and a nonce.
 Acceptance: escape/abuse fixtures (network call, fork bomb, writing outside workspace, reading `$HOME`, infinite loop) are all contained and reported.
 
-**Decision (2026-10-15):** this machine has no container runtime, so the brief's "realistic local fallback, clearly labelled" applies: a macOS Seatbelt backend (`sandbox-exec`, deny-by-default) with rlimits and a memory/disk watchdog, labelled as weaker than a container wherever results are shown. `auto` prefers Docker. The Docker backend is unit-tested at the command-line level and exercised for real by CI.
+**Decision (2026-10-15):** this machine has no container runtime, so the brief's "realistic local fallback, clearly labelled" applies: a macOS Seatbelt backend (`sandbox-exec`, deny-by-default) with rlimits and a memory/disk watchdog, labelled as weaker than a container wherever results are shown. `auto` prefers Docker. The Docker backend is unit-tested at the command-line level and was later exercised for real under Colima (see PROGRESS.md); CI runs it too once the repository has a remote.
 
 ### M3 — Iterative repair loop  (done)
 
@@ -78,7 +78,7 @@ Direct-patch LLM vs retrieval-assisted vs test-feedback agent under equal call/t
 
 ### M6 — Public subset  (done)
 
-12 tasks derived from QuixBugs (MIT), with provenance, leakage checks and contamination caveats.
+25 tasks derived from QuixBugs (MIT; 12 at first, extended to every eligible program in v2), with provenance, leakage checks and contamination caveats.
 
 ### M7 — Dashboard and hardening  (done)
 

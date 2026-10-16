@@ -41,6 +41,9 @@ from .common import finish_result, sandbox_env, scratch_usage
 from .process import run_monitored
 
 DEFAULT_IMAGE = "python:3.12-slim"
+# The official python images install CPython under /usr/local/bin; with only
+# /usr/bin:/bin the entrypoint is not found and every run exits 127.
+CONTAINER_PATH = "/usr/local/bin:/usr/bin:/bin"
 ISOLATION = (
     "Docker container: --network none, non-root, read-only rootfs and workspace, tmpfs /tmp, "
     "CPU/memory/pids limits, all capabilities dropped"
@@ -84,6 +87,7 @@ def build_run_argv(
         home="/tmp",  # noqa: S108 - the container's own tmpfs
         results_path=f"/out/{RESULTS_FILE}",
         nonce=job.nonce,
+        path=CONTAINER_PATH,
     )
     argv = [
         docker_bin,
@@ -121,7 +125,10 @@ def build_run_argv(
         "--ulimit",
         f"fsize={limits.max_file_mb * 1024 * 1024}:{limits.max_file_mb * 1024 * 1024}",
         "--ulimit",
-        f"cpu={limits.cpu_seconds}:{limits.cpu_seconds}",
+        # Linux checks the hard limit first: with soft == hard the process gets SIGKILL
+        # (exit 137, indistinguishable from other kills) instead of SIGXCPU (exit 152).
+        # One extra second lets SIGXCPU arrive first; SIGKILL still backs it up.
+        f"cpu={limits.cpu_seconds}:{limits.cpu_seconds + 1}",
         "--ulimit",
         "core=0:0",
         "--tmpfs",

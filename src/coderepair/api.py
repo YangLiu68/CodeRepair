@@ -249,7 +249,14 @@ def create_app(settings: Settings | None = None, *, extra_hosts: tuple[str, ...]
         out = []
         for name, path in _result_files().items():
             data = json.loads(path.read_text(encoding="utf-8"))
-            out.append({"name": name, "meta": data.get("meta"), "summary": data.get("summary")})
+            out.append(
+                {
+                    "name": name,
+                    "meta": data.get("meta"),
+                    "summary": data.get("summary"),
+                    "paired": data.get("paired") or [],
+                }
+            )
         return out
 
     @app.get("/api/benchmarks/{name}")

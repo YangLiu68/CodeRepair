@@ -36,21 +36,21 @@ issue + repo ─► retrieval with reasons ─► model ─► validated edits �
 - **A real approval gate.** Approvals record reviewer, time and diff hash; `apply` re-verifies the
   repository byte-for-byte and writes files without git. A patch that passes every hidden test but
   adds `os.system("curl … | sh")` is stopped (see the demo).
-- **Honest evaluation.** 10 first-party seeded-bug tasks plus 12 tasks derived from QuixBugs (MIT),
-  hidden tests, leakage checks on every prompt, and a comparative benchmark of three agents under
-  equal budgets.
+- **Honest evaluation.** 10 first-party seeded-bug tasks plus 25 tasks derived from QuixBugs (MIT),
+  hidden tests, leakage checks on every prompt, and a comparative benchmark of three agents (plus
+  an ablation) under equal budgets, with confidence intervals and exact paired tests.
 
 ## Status
 
 | Milestone | State |
 |---|---|
 | M1 fixtures, ingestion, issue parsing, read-only search, patch proposal, diff display | done |
-| M2 disposable, network-less test sandbox with abuse probes | done (Docker backend verified by command-line tests locally; runs for real in CI) |
+| M2 disposable, network-less test sandbox with abuse probes | done (Seatbelt on macOS; Docker run for real under Colima: probes 15/15, 35/35 tasks valid) |
 | M3 iterative repair loop | done |
 | M4 candidates, reproduction tests, lint/type/security checks, human approval | done |
-| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done, one local 3B model (see below) |
+| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done, two local 3B models plus an ablation (see below) |
 | M6 licensed public subset (QuixBugs) with leakage controls | done |
-| M7 dashboard, CI, threat model, docs, demo | done (CI has not run: no remote yet) |
+| M7 dashboard, CI, threat model, docs, demo | done (GitHub Actions has not run: no remote; its steps pass in a local Linux VM on Python 3.11–3.13) |
 
 Progress log with test results per milestone: [PROGRESS.md](PROGRESS.md).
 
@@ -62,12 +62,13 @@ Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/). Test execution ne
 ```bash
 uv sync --all-extras
 uv run coderepair sandbox status && uv run coderepair sandbox selftest
-uv run coderepair tasks                                   # 10 fixtures + 12 public tasks
+uv run coderepair tasks                                   # 10 fixtures + 25 public tasks
 uv run coderepair repair t01_paginate_off_by_one --evaluate          # oracle mock by default
 uv run coderepair repair t02_mutable_default_tags --backend scripted \
     --script docs/demo/repro_t02.json --candidates 2 --repro-test   # reproduction-test ranking
 uv run coderepair review <run-id> && uv run coderepair approve <run-id> --reviewer you
 uv run coderepair bench --backend oracle --tasks t01_paginate_off_by_one q06_gcd
+uv run coderepair bench-report docs/results/m5v2_*.jsonl          # CIs + paired tests, pooled by task
 uv run coderepair serve                                   # dashboard on http://127.0.0.1:8000
 uv run pytest -rs
 ```
@@ -91,23 +92,26 @@ Configuration is environment-only; see [.env.example](.env.example).
 
 ## Measured
 
-Comparative benchmark (M5), local `qwen2.5:3b`, 22 tasks, at most 3 model calls per agent per task,
-hidden tests scored in the sandbox:
+Comparative benchmark (M5), 35 tasks, two local 3B models through Ollama, at most 3 model calls per
+agent per task, hidden tests scored in the sandbox. Resolved tasks with 95% Wilson intervals:
 
-| Agent | Resolved | Statically valid patch | Anchor-mismatch failures | Tokens |
-|---|---|---|---|---|
-| direct (no retrieval, no tests) | 1/22 | 11/22 | 8 | 72k |
-| retrieval (ranked context, no tests) | 3/22 | 14/22 | 6 | 72k |
-| feedback (retrieval + sandboxed test loop) | 3/22 | 17/22 | 2 | 98k |
+| Agent | `qwen2.5:3b` | `qwen2.5-coder:3b` |
+|---|---|---|
+| direct (no retrieval, no tests) | 4/35 (5–26%) | 3/35 (3–22%) |
+| retrieval (ranked context, no tests) | 4/35 (5–26%) | 7/35 (10–36%) |
+| feedback (retrieval + sandboxed test loop) | 2/35 (2–19%) | 5/35 (6–29%) |
+| feedback-sampled (ablation: the loop's retries sampled) | 5/35 (6–29%) | 5/35 (6–29%) |
 
-A 3B model is too weak for these tasks, and with 22 tasks and one run, one or two tasks of difference
-is noise: this run does **not** show that test feedback resolves more issues. It does show where each
-agent fails: retrieval and the loop's anchor hints turn most format failures into valid patches,
-which the small model then gets wrong. Details, per-task results and caveats: [BENCHMARK.md](BENCHMARK.md).
+These models are too weak to rank the agents: no pairwise difference is significant (smallest
+p = 0.125, exact paired test by task over both models), so this does **not** show that test
+feedback resolves more issues. What the run does show: at temperature 0 the test-feedback loop
+never turned a failed first attempt into a fix (0 of 63), and the gap between retrieval and feedback
+came from retrieval's temperature-0.7 resamples, which the `feedback-sampled` ablation was added to
+isolate. Details, per-task results and caveats: [BENCHMARK.md](BENCHMARK.md).
 
 Other measurements: retrieval recall@1 0.90 / recall@3 1.00 on the fixtures (random: 0.26 / 0.77;
-the repos have 3–5 source files, so this mostly shows the plumbing works); all 22 tasks validate in
-the sandbox; gold patches resolve and buggy repos fail for every task.
+the repos have 3–5 source files, so this mostly shows the plumbing works); all 35 tasks validate in
+both sandboxes; gold patches resolve and buggy repos fail for every task.
 
 ## Security posture
 
@@ -138,7 +142,7 @@ src/coderepair/
   benchmark/        tasks, oracle, validator, hidden-test evaluation, comparative benchmark (M5)
   cli.py api.py static/                                                      CLI and dashboard (M7)
 benchmarks/tasks/   10 first-party seeded-bug tasks
-benchmarks/public/  12 QuixBugs-derived tasks (MIT; see LICENSE_NOTES.md)
+benchmarks/public/  25 QuixBugs-derived tasks (MIT; see LICENSE_NOTES.md)
 scripts/            public-subset builder, M1 smoke run
 docs/               demo, demo inputs, recorded results
 tests/              unit, security, sandbox, loop, review, public-suite and API tests

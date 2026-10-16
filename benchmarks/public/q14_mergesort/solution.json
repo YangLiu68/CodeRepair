@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of mergesort.",
+  "edits": [
+    {
+      "path": "algo/mergesort.py",
+      "old": "    if len(arr) == 0:\n",
+      "new": "    if len(arr) <= 1:\n"
+    }
+  ]
+}

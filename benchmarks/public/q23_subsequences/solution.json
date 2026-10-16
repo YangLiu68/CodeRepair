@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of subsequences.",
+  "edits": [
+    {
+      "path": "algo/subsequences.py",
+      "old": "        return []\n",
+      "new": "        return [[]]\n"
+    }
+  ]
+}

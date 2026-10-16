@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of shunting_yard.",
+  "edits": [
+    {
+      "path": "algo/shunting_yard.py",
+      "old": "                rpntokens.append(opstack.pop())\n\n",
+      "new": "                rpntokens.append(opstack.pop())\n            opstack.append(token)\n\n"
+    }
+  ]
+}

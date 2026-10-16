@@ -1,0 +1,26 @@
+id = "q22_sqrt"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "failing test provided; observed vs expected outputs"
+fail_to_pass = [
+    "tests/test_sqrt.py::test_sqrt[case0]",
+    "tests/test_hidden_sqrt.py::test_hidden_sqrt[case2]",
+    "tests/test_hidden_sqrt.py::test_hidden_sqrt[case3]",
+    "tests/test_hidden_sqrt.py::test_hidden_sqrt[case4]",
+    "tests/test_hidden_sqrt.py::test_hidden_sqrt[case5]",
+    "tests/test_hidden_sqrt.py::test_hidden_sqrt[case6]",
+]
+pass_to_pass = [
+    "tests/test_sqrt.py::test_sqrt[case1]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/sqrt.py"
+upstream_fixed = "correct_python_programs/sqrt.py"
+upstream_cases = "json_testcases/sqrt.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in sqrt (one-line bug)"

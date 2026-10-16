@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of rpn_eval.",
+  "edits": [
+    {
+      "path": "algo/rpn_eval.py",
+      "old": "                op(token, a, b)\n",
+      "new": "                op(token, b, a)\n"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+diff --git a/algo/wrap.py b/algo/wrap.py
+--- a/algo/wrap.py
++++ b/algo/wrap.py
+@@ -7,6 +7,7 @@
+         line, text = text[:end], text[end:]
+         lines.append(line)
+ 
++    lines.append(text)
+     return lines
+ 
+ """

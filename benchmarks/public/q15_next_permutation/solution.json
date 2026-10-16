@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of next_permutation.",
+  "edits": [
+    {
+      "path": "algo/next_permutation.py",
+      "old": "                if perm[j] < perm[i]:\n",
+      "new": "                if perm[i] < perm[j]:\n"
+    }
+  ]
+}

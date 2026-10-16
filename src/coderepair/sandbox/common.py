@@ -10,10 +10,12 @@ from .process import ProcessOutcome
 from .results import ResultsError, read_results_file
 
 
-def sandbox_env(*, home: str, results_path: str, nonce: str) -> dict[str, str]:
+def sandbox_env(
+    *, home: str, results_path: str, nonce: str, path: str = "/usr/bin:/bin"
+) -> dict[str, str]:
     """The complete environment of a sandboxed run (nothing is inherited from the host)."""
     return {
-        "PATH": "/usr/bin:/bin",
+        "PATH": path,
         "HOME": home,
         "TMPDIR": home,
         "USER": "sandbox",
@@ -28,6 +30,19 @@ def sandbox_env(*, home: str, results_path: str, nonce: str) -> dict[str, str]:
         "CODEREPAIR_RESULTS_PATH": results_path,
         "CODEREPAIR_RESULTS_NONCE": nonce,
     }
+
+
+#: pytest exit statuses after which the reported outcomes cannot be complete.
+INCOMPLETE_EXIT_STATUSES = {2: "interrupted", 3: "internal error", 4: "usage error"}
+
+
+def _aborted(results) -> bool:
+    # Collection errors also end with status 2 ("interrupted"); that outcome is complete
+    # in its own way (no test ran, every expected test counts as missing) and is reported
+    # as collection errors, so only an interruption without them is an abort.
+    if results.exitstatus == 2:
+        return not results.collect_errors
+    return results.exitstatus in INCOMPLETE_EXIT_STATUSES
 
 
 def finish_result(
@@ -69,6 +84,13 @@ def finish_result(
             result.problems.append(
                 f"pytest reported exit status {result.results.exitstatus} "
                 f"but the process exited with {rc}"
+            )
+        elif _aborted(result.results) and limit is None:
+            # The results file is written even when the session aborts, so it may list
+            # only the tests that ran before the abort: never treat it as complete.
+            result.problems.append(
+                f"pytest session aborted ({INCOMPLETE_EXIT_STATUSES[result.results.exitstatus]}, "
+                f"exit status {result.results.exitstatus}); results are partial"
             )
     return result
 

@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of to_base.",
+  "edits": [
+    {
+      "path": "algo/to_base.py",
+      "old": "        result = result + alphabet[i]\n",
+      "new": "        result = alphabet[i] + result\n"
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 # Demo walkthrough
 
 About ten minutes, no API key or network needed. Output is abridged from real runs on 2026-10-15
-on macOS (Seatbelt sandbox). On Linux with Docker the commands are the same and the sandbox line
-says `docker`.
+on macOS (Seatbelt sandbox), recorded before the public subset grew from 12 to 25 tasks and before
+Docker was installed on this machine. On Linux with Docker the commands are the same and the
+sandbox line says `docker`.
 
 ```bash
 uv sync --all-extras
@@ -24,7 +25,8 @@ q01_bitcount                       algorithm                  easy    `bitcount`
 q12_lcs_length                     algorithm                  easy    `lcs_length` returns wrong results for some inputs
 ```
 
-`t*` are the ten first-party fixtures; `q*` are twelve tasks derived from QuixBugs (MIT). The
+`t*` are the ten first-party fixtures; `q*` are tasks derived from QuixBugs (MIT; twelve when this
+was recorded, 25 now). The
 agent sees only each task's `repo/` and `issue.md`.
 
 ## 2. The sandbox

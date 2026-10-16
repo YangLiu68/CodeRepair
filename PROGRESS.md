@@ -1,5 +1,73 @@
 # Progress log
 
+## 2026-10-15 (evening) — Third review, public subset v2, statistics, Docker for real, M5 v2
+
+### Implemented
+
+| Area | Change |
+|---|---|
+| Statistics | `benchmark/stats.py`: Wilson 95% intervals, exact McNemar, exact sign-flip test pooled by task; `coderepair bench-report FILE...` (drops rows on changed task content, refuses duplicate files); intervals and paired tables in the markdown summary, `/api/benchmarks` and the dashboard |
+| Public subset v2 | 25 tasks (all eligible QuixBugs programs), timer that wraps only the test function, masked object addresses, specification checks for tasks with several valid outputs, corrections timed (≤ 0.5 s per case), two identical runs required. Details: BENCHMARK.md, Revisions |
+| Harness | pytest sessions that ended interrupted, with an internal error or a usage error are never complete (`common.INCOMPLETE_EXIT_STATUSES`) |
+| Docker backend | container `PATH` includes `/usr/local/bin`; CPU hard limit one second above the soft limit |
+| Benchmark | `feedback-sampled` ablation agent (opt-in with `--agents`); the configuration fingerprint no longer includes the agent list, so adding an agent to a results file reuses the other agents' rows (the two v2 files were re-keyed after checking that each stored hash matched its recorded settings; no row changed) |
+
+### Problems found and fixed
+
+- **Partial pytest sessions counted as complete.** The public tasks' 2-second timer was an autouse
+  fixture, still armed while pytest built a failure report; a long traceback could be interrupted,
+  pytest ended with `INTERNALERROR`, and the harness accepted the partial results. In earlier builds
+  this silently dropped failing cases from `flatten` and `mergesort`. Fixed in three places (timer
+  scope, aborted-session detection, builder requires complete and repeatable sessions), each with a
+  regression test and a negative control that fails on the old conftest.
+- **A third independent review** (of this session's changes) found: `bench-report` mixed in rows
+  from changed tasks; the pooled test treated several runs of a task as independent tasks
+  (overstated significance; now one unit per task); p-values printed as `0.00`; a shortened observed
+  output in `wrap` looked like the bug; three tasks graded one valid output among several; the
+  corrections were never timed; the timer was still armed during teardown; several doc claims. All
+  fixed before any model ran on v2.
+- **The Docker backend's first real run failed completely** (Colima, Docker 29.5.2): every
+  container exited 127 (`exec python3 failed`) because the sandbox `PATH` was `/usr/bin:/bin` and
+  the official images keep CPython in `/usr/local/bin`. The failure was loud, not silent: the
+  selftest flagged 12 of 15 probes (a run without results only counts as contained where that is
+  the expected outcome), and every task failed validation. A second bug: with equal soft and hard
+  `RLIMIT_CPU`, Linux sends SIGKILL (137) instead of SIGXCPU (152), so a CPU spin was not
+  labelled. Both fixed and pinned by
+  `test_docker_command_finds_python_and_reports_cpu_limits`.
+- My first emulation of the CI workflow in the Linux VM was itself wrong (macOS `tar` added
+  AppleDouble `._*` files, and the copy was not a git checkout, so ruff linted `.cache/`); fixed by
+  copying without metadata into a `git init`-ed directory.
+
+### M5 v2 results (35 tasks, Seatbelt, local Ollama)
+
+| Agent | `qwen2.5:3b` | `qwen2.5-coder:3b` |
+|---|---|---|
+| direct | 4/35 | 3/35 |
+| retrieval | 4/35 | 7/35 |
+| feedback | 2/35 | 5/35 |
+| feedback-sampled (ablation) | 5/35 | 5/35 |
+
+No pairwise difference is significant (smallest pooled p = 0.125). Test feedback at temperature 0
+added no resolution beyond the first call for either model (0 of 63); retrieval's extra
+resolutions all came from temperature-0.7 resamples after an invalid first patch, which is why the
+`feedback-sampled` ablation was added; with sampled retries the loop recovered 3 tasks for
+`qwen2.5:3b` and none for the coder model. Lease time on the shared machine: 54 min (qwen2.5:3b,
+public rows), 41 min (coder, all rows), 46 min (ablation, both models). Full write-up:
+BENCHMARK.md.
+
+### Verification
+
+| What | Result |
+|---|---|
+| Docker under Colima (Ubuntu 24.04 VM on this Mac) | selftest 15/15; all 95 Docker test variants pass; `validate-fixtures --suite all --sandbox docker` 35/35 |
+| CI workflow steps by hand in the Linux VM, Python 3.11 / 3.12 / 3.13 | each: ruff clean, selftest 15/15, pytest 433 passed / 95 skipped (Seatbelt variants + one case-insensitive-FS test), fixtures 10/10, public 25/25 in Docker, oracle smoke resolved |
+| `validate-fixtures --suite all --sandbox seatbelt` | 35/35 |
+| Final local run on macOS with Colima up (both backends, after every change above) | `uv run pytest` **532 passed, 0 skipped** (10 min); ruff check/format and `uv lock --check` clean; selftest 15/15 in Seatbelt and in Docker; 35/35 tasks valid in each |
+
+GitHub Actions itself has still never run (no remote). The VM run is an emulation of the workflow on
+a copy of the working tree taken before the `feedback-sampled` change; that change is covered by the
+final local run below.
+
 ## 2026-10-15 — Milestone 5: comparative benchmark run
 
 **What ran:** `coderepair bench --suite all --backend ollama` with `qwen2.5:3b` (the shared

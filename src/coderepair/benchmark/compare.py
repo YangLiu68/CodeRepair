@@ -1,4 +1,4 @@
-"""Milestone 5: comparative benchmark of three repair agents under equal budgets.
+"""Milestone 5: comparative benchmark of repair agents under equal budgets.
 
 Agents (all share the issue, the snapshot, the patch policy and the budget):
 
@@ -15,6 +15,11 @@ Agents (all share the issue, the snapshot, the patch policy and the budget):
     valid patch, validation errors and test failures fed back, up to
     ``max_calls`` attempts; the top-ranked candidate (Milestone 4 scorecards)
     is submitted.
+``feedback-sampled`` (ablation, not run by default)
+    ``feedback`` whose retries sample like the sampling agents' later samples
+    (``sample_index`` 1, 2, ...) instead of repeating the deterministic request.
+    ``feedback`` versus ``retrieval`` changes two things at once (test feedback
+    and no sampling); this agent changes only the first.
 
 Every submitted patch is scored by the harness with the hidden tests in the
 sandbox. ``pass@1`` is whether the agent's *first* model call alone would have
@@ -32,6 +37,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
+from itertools import combinations
 from pathlib import Path
 
 from ..agent import STATUS_PROPOSED, AttemptResult, attempt_proposal, build_context
@@ -46,9 +52,11 @@ from ..sandbox.base import Sandbox, SandboxLimits
 from ..trace import Trace, new_run_id
 from .evaluate import PatchEvaluation, evaluate_patch
 from .manifest import task_fingerprint
+from .stats import format_p, paired_comparisons, sign_flip_test, wilson_interval
 from .tasks import TaskSpec
 
-AGENTS = ("direct", "retrieval", "feedback")
+AGENTS = ("direct", "retrieval", "feedback")  # the default comparison
+ALL_AGENTS = (*AGENTS, "feedback-sampled")
 
 
 @dataclass(frozen=True)
@@ -174,7 +182,7 @@ def run_agent(
         first = attempts[0] if attempts else None
         overlay = dict(chosen.patch.changed_files) if chosen else None
         last_errors = attempts[-1].errors if attempts else ["no attempts"]
-    elif agent == "feedback":
+    elif agent in ("feedback", "feedback-sampled"):
         snapshot = ingest_repository(task.repo_dir, (task.dir,), limits)
         run = repair(
             snapshot,
@@ -189,6 +197,7 @@ def run_agent(
                 max_wall_s=budget.max_wall_s,
                 candidates=1,
                 repro_test=False,
+                sample_retries=agent == "feedback-sampled",
             ),
             limits=limits,
             sandbox_limits=sandbox_limits,
@@ -270,7 +279,9 @@ def task_hash(task: TaskSpec) -> str:
 
 
 def config_fingerprint(meta: dict) -> str:
-    keys = ("backend", "model", "budget", "agents", "sandbox", "sandbox_limits")
+    # The agent list is deliberately not part of it: a row depends only on its own
+    # agent, so adding an agent to an existing results file reuses the other rows.
+    keys = ("backend", "model", "budget", "sandbox", "sandbox_limits")
     return hashlib.sha256(
         json.dumps({k: meta[k] for k in keys}, sort_keys=True).encode()
     ).hexdigest()[:12]
@@ -279,7 +290,7 @@ def config_fingerprint(meta: dict) -> str:
 def summarize(rows: list[BenchRow]) -> dict:
     out: dict = {}
     for agent in sorted(
-        {r.agent for r in rows}, key=lambda a: AGENTS.index(a) if a in AGENTS else 99
+        {r.agent for r in rows}, key=lambda a: ALL_AGENTS.index(a) if a in ALL_AGENTS else 99
     ):
         mine = [r for r in rows if r.agent == agent]
         by_suite = {}
@@ -290,10 +301,12 @@ def summarize(rows: list[BenchRow]) -> dict:
                 "resolved": sum(r.resolved for r in suite_rows),
             }
         n = len(mine)
+        resolved = sum(r.resolved for r in mine)
         out[agent] = {
             "tasks": n,
-            "resolved": sum(r.resolved for r in mine),
-            "resolve_rate": round(sum(r.resolved for r in mine) / n, 3) if n else 0.0,
+            "resolved": resolved,
+            "resolve_rate": round(resolved / n, 3) if n else 0.0,
+            "resolve_ci95": [round(x, 3) for x in wilson_interval(resolved, n)],
             "pass_at_1": sum(r.pass_at_1 for r in mine),
             "valid_patch": sum(r.status in ("resolved", "unresolved") for r in mine),
             "regressions": sum(r.p2p_broken > 0 for r in mine),
@@ -311,21 +324,52 @@ def summarize(rows: list[BenchRow]) -> dict:
     return out
 
 
+def paired(rows: list[BenchRow], agents: list[str]) -> list[dict]:
+    """Exact McNemar comparison of every pair of agents on the tasks both ran."""
+    outcomes: dict[str, dict[str, bool]] = {}
+    for r in rows:
+        outcomes.setdefault(r.agent, {})[r.task_id] = r.resolved
+    return [
+        {
+            "a": c.a,
+            "b": c.b,
+            "tasks": c.tasks,
+            "both": c.both,
+            "only_a": c.only_a,
+            "only_b": c.only_b,
+            "neither": c.neither,
+            "p_value": round(c.p_value, 4),
+        }
+        for c in paired_comparisons(outcomes, agents)
+    ]
+
+
 def render_markdown(meta: dict, summary: dict, rows: list[BenchRow]) -> str:
     lines = [
         f"Backend `{meta['backend']}` / model `{meta['model']}`, budget {meta['budget']}, "
         f"{meta['date']}, {meta['machine']}, sandbox `{meta['sandbox']}`.",
         "",
-        "| Agent | Resolved | pass@1 | Valid patch | Regressions | Mean calls | Mean tokens | "
-        "Median LLM s | Median wall s |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Agent | Resolved | 95% CI | pass@1 | Valid patch | Regressions | Mean calls | "
+        "Mean tokens | Median LLM s | Median wall s |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for agent, s in summary.items():
+        lo, hi = wilson_interval(s["resolved"], s["tasks"])
         lines.append(
-            f"| {agent} | {s['resolved']}/{s['tasks']} | {s['pass_at_1']}/{s['tasks']} | "
+            f"| {agent} | {s['resolved']}/{s['tasks']} | {100 * lo:.0f}–{100 * hi:.0f}% | "
+            f"{s['pass_at_1']}/{s['tasks']} | "
             f"{s['valid_patch']}/{s['tasks']} | {s['regressions']} | {s['mean_calls']} | "
             f"{s['mean_tokens']} | {s['median_llm_latency_s']} | {s['median_wall_s']} |"
         )
+    comparisons = paired(rows, list(summary))
+    if comparisons:
+        lines += [
+            "",
+            "Paired comparison on the same tasks (`Only A` / `Only B`: tasks exactly one of the "
+            "two agents resolved):",
+            "",
+            *_paired_table(comparisons),
+        ]
     lines += ["", "| Task | " + " | ".join(summary) + " |", "|---|" + "---|" * len(summary)]
     for task_id in sorted({r.task_id for r in rows}):
         cells = []
@@ -411,12 +455,18 @@ def run_benchmark(
                 fh.write(json.dumps({"config": fingerprint, "row": asdict(row)}) + "\n")
                 fh.flush()
                 progress(
-                    f"{task.id:<34} {agent:<9} {row.status:<10} {row.failure:<16} "
+                    f"{task.id:<34} {agent:<16} {row.status:<10} {row.failure:<16} "
                     f"calls={row.calls} tokens={row.input_tokens + row.output_tokens} "
                     f"llm={row.llm_latency_s}s"
                 )
     rows = [done[key] for key in sorted(done)]
-    return {"meta": meta, "config": fingerprint, "summary": summarize(rows), "rows": rows}
+    return {
+        "meta": meta,
+        "config": fingerprint,
+        "summary": summarize(rows),
+        "paired": paired(rows, list(agents)),
+        "rows": rows,
+    }
 
 
 def _error_row(suite: str, task: TaskSpec, agent: str, backend: LLMBackend, exc: Exception):
@@ -440,3 +490,103 @@ def _error_row(suite: str, task: TaskSpec, agent: str, backend: LLMBackend, exc:
         diff_lines=0,
         detail=f"{type(exc).__name__}: {exc}"[:300],
     )
+
+
+# ------------------------------------------------------------------- reports
+
+
+def load_rows(path: Path) -> tuple[str, list[BenchRow]]:
+    """Rows of the most recent configuration in a results JSONL (last row per pair wins)."""
+    records = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+            records.append((record["config"], BenchRow(**record["row"])))
+        except (ValueError, KeyError, TypeError):
+            continue
+    if not records:
+        return "", []
+    config = records[-1][0]
+    latest = {row.key(): row for cfg, row in records if cfg == config}
+    return config, [latest[k] for k in sorted(latest)]
+
+
+def render_report(paths: list[Path], current_hashes: dict[str, str] | None = None) -> str:
+    """Per-file summaries with confidence intervals, plus a test pooled over files.
+
+    ``current_hashes`` (task id -> task hash) drops rows produced on task content
+    that has since changed, as resuming a run would. The pooled comparison keeps
+    every task as one unit: per task it sums (A resolved) - (B resolved) over the
+    files and applies an exact sign-flip test, so several models or seeds on the
+    same tasks add evidence without being counted as independent tasks.
+    """
+    lines: list[str] = []
+    per_task: dict[tuple[str, str], dict[str, int]] = {}  # (agent, task) -> file -> resolved
+    agents: list[str] = []
+    for index, path in enumerate(paths):
+        config, rows = load_rows(path)
+        if current_hashes is not None:
+            stale = [r for r in rows if r.task_hash != current_hashes.get(r.task_id)]
+            rows = [r for r in rows if r.task_hash == current_hashes.get(r.task_id)]
+        else:
+            stale = []
+        if not rows:
+            lines += [f"## {path.name}", "", "no current rows", ""]
+            continue
+        summary = summarize(rows)
+        lines += [f"## {path.name}: `{rows[0].backend}` / `{rows[0].model}` (config {config})", ""]
+        if stale:
+            lines += [f"{len(stale)} rows on outdated task content were left out.", ""]
+        lines += ["| Agent | Resolved | 95% CI | Valid patch |", "|---|---|---|---|"]
+        for agent, s in summary.items():
+            lo, hi = wilson_interval(s["resolved"], s["tasks"])
+            lines.append(
+                f"| {agent} | {s['resolved']}/{s['tasks']} | {100 * lo:.0f}–{100 * hi:.0f}% | "
+                f"{s['valid_patch']}/{s['tasks']} |"
+            )
+        lines += [""] + _paired_table(paired(rows, list(summary))) + [""]
+        for row in rows:
+            per_task.setdefault((row.agent, row.task_id), {})[str(index)] = int(row.resolved)
+            if row.agent not in agents:
+                agents.append(row.agent)
+    if len(paths) > 1:
+        agents.sort(key=lambda a: ALL_AGENTS.index(a) if a in ALL_AGENTS else 99)
+        lines += ["## Pooled over all files (one unit per task)", ""]
+        lines += ["| Agent | Resolved runs |", "|---|---|"]
+        for agent in agents:
+            runs = [v for (a, _), files in per_task.items() if a == agent for v in files.values()]
+            lines.append(f"| {agent} | {sum(runs)}/{len(runs)} |")
+        lines += [
+            "",
+            "| A vs B | Tasks | Runs | A − B (resolved runs) | p (exact sign-flip, by task) |",
+            "|---|---|---|---|---|",
+        ]
+        tasks = sorted({t for (_, t) in per_task})
+        for a, b in combinations(agents, 2):
+            diffs, runs = [], 0
+            for task in tasks:
+                fa, fb = per_task.get((a, task), {}), per_task.get((b, task), {})
+                shared = set(fa) & set(fb)
+                if shared:
+                    runs += len(shared)
+                    diffs.append(sum(fa[f] - fb[f] for f in shared))
+            lines.append(
+                f"| {a} vs {b} | {len(diffs)} | {runs} | {sum(diffs):+d} | "
+                f"{format_p(sign_flip_test(diffs))} |"
+            )
+        lines += [
+            "",
+            "Confidence intervals are not pooled: runs of the same task are correlated.",
+            "",
+        ]
+    return "\n".join(lines)
+
+
+def _paired_table(comparisons: list[dict]) -> list[str]:
+    out = ["| A vs B | Tasks | Only A | Only B | p (exact McNemar) |", "|---|---|---|---|---|"]
+    for c in comparisons:
+        out.append(
+            f"| {c['a']} vs {c['b']} | {c['tasks']} | {c['only_a']} | {c['only_b']} | "
+            f"{format_p(c['p_value'])} |"
+        )
+    return out

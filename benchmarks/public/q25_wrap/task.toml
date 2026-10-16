@@ -1,0 +1,24 @@
+id = "q25_wrap"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "failing test provided; observed vs expected outputs"
+fail_to_pass = [
+    "tests/test_wrap.py::test_wrap[case0]",
+    "tests/test_hidden_wrap.py::test_hidden_wrap[case1]",
+    "tests/test_hidden_wrap.py::test_hidden_wrap[case2]",
+    "tests/test_hidden_wrap.py::test_hidden_wrap[case3]",
+    "tests/test_hidden_wrap.py::test_hidden_wrap[case4]",
+]
+pass_to_pass = [
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/wrap.py"
+upstream_fixed = "correct_python_programs/wrap.py"
+upstream_cases = "json_testcases/wrap.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in wrap (one-line bug)"

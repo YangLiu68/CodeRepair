@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of wrap.",
+  "edits": [
+    {
+      "path": "algo/wrap.py",
+      "old": "\n    return lines\n",
+      "new": "\n    lines.append(text)\n    return lines\n"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of sieve.",
+  "edits": [
+    {
+      "path": "algo/sieve.py",
+      "old": "        if any(n % p > 0 for p in primes):\n",
+      "new": "        if all(n % p > 0 for p in primes):\n"
+    }
+  ]
+}

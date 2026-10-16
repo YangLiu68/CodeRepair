@@ -55,6 +55,40 @@ def test_every_model_call_is_counted_and_capped(sandbox, tmp_path):
     assert row.status == "no-patch" and row.failure == "anchor-mismatch"
 
 
+def test_sampled_feedback_differs_from_feedback_only_in_sampling(sandbox, tmp_path):
+    bad = json.dumps(
+        {"summary": "", "edits": [{"path": "pager/core.py", "old": "nope", "new": "x"}]}
+    )
+    backends = []
+
+    def backend_for(_t):
+        backends.append(ScriptedBackend([bad] * 10))
+        return backends[-1]
+
+    agents = ("feedback", "feedback-sampled")
+    result = _bench(tmp_path, [T01], agents, backend_for, sandbox, max_calls=3)
+    assert [r.agent for r in result["rows"]] == list(agents)
+    _probe, plain, sampled = backends
+    assert [r.sample_index for r in plain.requests] == [0, 0, 0]
+    assert [r.sample_index for r in sampled.requests] == [0, 1, 2]
+    # Same prompts, including the fed-back validation errors: only the sampling differs.
+    assert [r.user for r in plain.requests] == [r.user for r in sampled.requests]
+    assert "not found" in plain.requests[1].user
+
+
+def test_adding_an_agent_reuses_the_other_agents_rows(sandbox, tmp_path):
+    _bench(tmp_path, [T01], ("retrieval",), OracleBackend, sandbox)
+    calls = []
+
+    def counting(t):
+        calls.append(t.id)
+        return OracleBackend(t)
+
+    result = _bench(tmp_path, [T01], ("retrieval", "direct"), counting, sandbox)
+    assert len(calls) == 2  # the metadata probe and the new agent; retrieval was reused
+    assert sorted(r.agent for r in result["rows"]) == ["direct", "retrieval"]
+
+
 def test_resume_reuses_only_matching_rows_and_survives_truncation(sandbox, tmp_path):
     first = _bench(tmp_path, [T01, T02], ("retrieval",), OracleBackend, sandbox)
     assert len(first["rows"]) == 2

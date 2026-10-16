@@ -1,0 +1,24 @@
+id = "q21_sieve"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "observed vs expected outputs only (issue-only)"
+fail_to_pass = [
+    "tests/test_hidden_sieve.py::test_hidden_sieve[case2]",
+    "tests/test_hidden_sieve.py::test_hidden_sieve[case3]",
+    "tests/test_hidden_sieve.py::test_hidden_sieve[case4]",
+    "tests/test_hidden_sieve.py::test_hidden_sieve[case5]",
+]
+pass_to_pass = [
+    "tests/test_sieve.py::test_sieve[case0]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/sieve.py"
+upstream_fixed = "correct_python_programs/sieve.py"
+upstream_cases = "json_testcases/sieve.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in sieve (one-line bug)"

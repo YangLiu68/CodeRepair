@@ -1,0 +1,25 @@
+id = "q20_shunting_yard"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "failing test provided; observed vs expected outputs"
+fail_to_pass = [
+    "tests/test_shunting_yard.py::test_shunting_yard[case2]",
+    "tests/test_hidden_shunting_yard.py::test_hidden_shunting_yard[case3]",
+    "tests/test_hidden_shunting_yard.py::test_hidden_shunting_yard[case4]",
+    "tests/test_hidden_shunting_yard.py::test_hidden_shunting_yard[case5]",
+]
+pass_to_pass = [
+    "tests/test_shunting_yard.py::test_shunting_yard[case0]",
+    "tests/test_shunting_yard.py::test_shunting_yard[case1]",
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/shunting_yard.py"
+upstream_fixed = "correct_python_programs/shunting_yard.py"
+upstream_cases = "json_testcases/shunting_yard.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in shunting_yard (one-line bug)"

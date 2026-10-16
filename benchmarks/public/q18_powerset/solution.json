@@ -1,0 +1,15 @@
+{
+  "summary": "Upstream correction of powerset.",
+  "edits": [
+    {
+      "path": "algo/powerset.py",
+      "old": "        first, *rest = arr #python3 just like car and cdr (in this case anyway..)\n",
+      "new": "        first, *rest = arr\n"
+    },
+    {
+      "path": "algo/powerset.py",
+      "old": "        return [[first] + subset for subset in rest_subsets]\n",
+      "new": "        return rest_subsets + [[first] + subset for subset in rest_subsets]\n"
+    }
+  ]
+}

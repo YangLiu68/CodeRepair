@@ -1,0 +1,10 @@
+{
+  "summary": "Upstream correction of pascal.",
+  "edits": [
+    {
+      "path": "algo/pascal.py",
+      "old": "        for c in range(0, r):\n",
+      "new": "        for c in range(0, r + 1):\n"
+    }
+  ]
+}

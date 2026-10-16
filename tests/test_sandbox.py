@@ -258,6 +258,19 @@ def test_docker_command_applies_every_isolation_control(tmp_path, monkeypatch):
     assert argv[image_at + 1 :][:4] == ["-I", "-S", "-B", "/opt/coderepair/bootstrap.py"]
 
 
+def test_docker_command_finds_python_and_reports_cpu_limits(tmp_path):
+    # Both broke the first real run under Colima: the official images keep python3 in
+    # /usr/local/bin (every container exited 127), and with soft == hard CPU limits Linux
+    # sends SIGKILL (137) instead of SIGXCPU (152), so a spin loop was not labelled.
+    argv, _ = _docker_argv(tmp_path)
+    env = dict(e.split("=", 1) for e in _flag_values(argv, "--env"))
+    assert "/usr/local/bin" in env["PATH"].split(":")
+    assert _flag_values(argv, "--entrypoint") == ["python3"]
+    (cpu,) = [u for u in _flag_values(argv, "--ulimit") if u.startswith("cpu=")]
+    soft, hard = (int(v) for v in cpu.removeprefix("cpu=").split(":"))
+    assert soft == SandboxLimits().cpu_seconds and hard > soft
+
+
 def test_docker_command_rejects_unsafe_mounts_and_images(tmp_path):
     run_dir = new_run_dir()
     try:
@@ -568,3 +581,60 @@ def test_docker_output_dir_is_size_capped(tmp_path):
     assert watchdog(0) is None
     (tmp_path / "big").write_bytes(b"\1" * (2 * 1024 * 1024))
     assert watchdog(0) == "disk"
+
+
+ABORTING_CONFTEST = """\
+def pytest_runtest_logreport(report):
+    if report.when == "call" and report.nodeid.endswith("test_b"):
+        raise RuntimeError("plugin crash")
+"""
+
+
+def test_an_aborted_session_is_never_complete(sandbox, tmp_path):
+    """pytest writes the results file even after INTERNALERROR; those results are partial."""
+    from coderepair.execution import run_repo_tests
+    from coderepair.repo import ingest_repository
+
+    root = tmp_path / "repo"
+    (root / "tests").mkdir(parents=True)
+    (root / "conftest.py").write_text(ABORTING_CONFTEST)
+    (root / "tests" / "test_x.py").write_text(
+        "def test_a():\n    pass\n\n\ndef test_b():\n    pass\n\n\ndef test_c():\n    pass\n"
+    )
+    result = run_repo_tests(ingest_repository(root, (tmp_path,)), sandbox)
+    assert result.exit_code == 3
+    assert not result.completed
+    assert any("aborted (internal error" in p for p in result.problems), result.problems
+
+
+def test_collection_errors_are_reported_not_treated_as_an_abort(sandbox, tmp_path):
+    from coderepair.execution import run_repo_tests
+    from coderepair.repo import ingest_repository
+
+    root = tmp_path / "repo"
+    (root / "tests").mkdir(parents=True)
+    (root / "tests" / "test_x.py").write_text(
+        "import missing_module\n\n\ndef test_a():\n    pass\n"
+    )
+    result = run_repo_tests(ingest_repository(root, (tmp_path,)), sandbox)
+    assert result.exit_code == 2
+    assert result.completed and result.problems == []
+    assert result.results.collect_errors == ("tests/test_x.py",)
+    assert not result.results.all_passed
+
+
+def test_an_interrupted_session_without_collection_errors_is_never_complete(sandbox, tmp_path):
+    from coderepair.execution import run_repo_tests
+    from coderepair.repo import ingest_repository
+
+    root = tmp_path / "repo"
+    (root / "tests").mkdir(parents=True)
+    (root / "tests" / "test_x.py").write_text(
+        "import pytest\n\n\ndef test_a():\n    pass\n\n\n"
+        "def test_b():\n    pytest.exit('stop here')\n\n\ndef test_c():\n    pass\n"
+    )
+    result = run_repo_tests(ingest_repository(root, (tmp_path,)), sandbox)
+    assert result.exit_code == 2 and result.results is not None
+    assert not result.results.collect_errors
+    assert not result.completed
+    assert any("aborted (interrupted" in p for p in result.problems), result.problems

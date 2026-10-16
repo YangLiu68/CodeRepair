@@ -1,0 +1,13 @@
+diff --git a/algo/possible_change.py b/algo/possible_change.py
+--- a/algo/possible_change.py
++++ b/algo/possible_change.py
+@@ -1,8 +1,7 @@
+-# Python 3
+ def possible_change(coins, total):
+     if total == 0:
+         return 1
+-    if total < 0:
++    if total < 0 or not coins:
+         return 0
+ 
+     first, *rest = coins

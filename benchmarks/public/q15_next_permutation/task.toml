@@ -1,0 +1,26 @@
+id = "q15_next_permutation"
+category = "algorithm"
+difficulty = "easy"
+issue_style = "failing test provided; observed vs expected outputs"
+fail_to_pass = [
+    "tests/test_next_permutation.py::test_next_permutation[case0]",
+    "tests/test_hidden_next_permutation.py::test_hidden_next_permutation[case1]",
+    "tests/test_hidden_next_permutation.py::test_hidden_next_permutation[case2]",
+    "tests/test_hidden_next_permutation.py::test_hidden_next_permutation[case3]",
+    "tests/test_hidden_next_permutation.py::test_hidden_next_permutation[case4]",
+    "tests/test_hidden_next_permutation.py::test_hidden_next_permutation[case5]",
+    "tests/test_hidden_next_permutation.py::test_hidden_next_permutation[case6]",
+]
+pass_to_pass = [
+]
+
+[provenance]
+origin = "QuixBugs (Lin, Koppel, Chen, Solar-Lezama, SPLASH 2017 Companion)"
+source = "https://github.com/jkoppel/QuixBugs"
+source_commit = "4257f44b0ff1181dedaedee6a447e133219fcebf"
+license = "MIT (see benchmarks/public/LICENSE-QuixBugs.txt and LICENSE_NOTES.md)"
+upstream_buggy = "python_programs/next_permutation.py"
+upstream_fixed = "correct_python_programs/next_permutation.py"
+upstream_cases = "json_testcases/next_permutation.json"
+created = "2026-10-15"
+seeded_bug = "upstream QuixBugs defect in next_permutation (one-line bug)"
