@@ -7,9 +7,13 @@ from typing import Protocol
 
 
 class BackendError(RuntimeError):
-    def __init__(self, message: str, *, retryable: bool = False) -> None:
+    def __init__(
+        self, message: str, *, retryable: bool = False, cost_usd: float | None = None
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        #: what a failed but billed call cost (e.g. a response truncated at max_tokens)
+        self.cost_usd = cost_usd
 
 
 @dataclass(frozen=True)

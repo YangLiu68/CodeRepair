@@ -23,7 +23,7 @@ pass. Run artifacts go to pytest temp directories.
 | `test_repo.py` | Snapshot contents and hashes; exclusion of secrets, binaries, oversized, non-UTF-8, symlinked files; limits; `.git/HEAD` parsing |
 | `test_issue.py`, `test_search.py`, `test_retrieval.py` | Issue hints, search, retrieval threshold (recall@3 ≥ 0.8), multi-file root cause |
 | `test_patch.py` | Output parsing, 14 path-policy violations, anchors, syntax errors, all-or-nothing, size limits, risk flags, `git apply --check` on every gold diff |
-| `test_backends.py`, `test_anthropic_backend.py` | Mocks, Ollama and the real Anthropic SDK against mock HTTP transports |
+| `test_backends.py`, `test_anthropic_backend.py`, `test_openrouter_backend.py` | Mocks, Ollama, the real Anthropic SDK and the OpenRouter client (endpoint lookup, sampling parameters, retries, billed failures, key handling) against mock HTTP transports |
 | `test_agent.py` | Oracle reproduces 10/10 gold diffs; no gold-added or hidden-test line in any prompt; traces; injection fencing; malicious output rejected |
 | `test_fixtures.py` | All fixtures valid (host); manifest; pass-to-pass lists; validator refuses untrusted roots and symlinks and detects broken tasks |
 | **`test_sandbox.py`** (M2) | Results parsing (nonce, shape, size, symlink, FIFO, huge integers, skips); workspace safety; runner bundle; the exact Seatbelt profile and `docker run` command; a session that aborts (pytest internal error, usage error, or an interruption other than collection errors) is never treated as complete, while collection errors stay a complete, failing result; factory never falls back to the host; process monitor (deadline, output cap, child killed when the monitor fails, control characters stripped); **every abuse probe contained**; **negative controls** (probes report escapes when isolation is removed, and the process-info probe catches the pre-review profile); fixtures behave identically in the sandbox; gold patches resolve and buggy repos do not for all 10 tasks; a plausible wrong patch is caught by a pass-to-pass test |
@@ -70,7 +70,9 @@ a sandbox.
   15/15, pytest 433 passed / 95 skipped (the Seatbelt variants, plus one test that needs a
   case-insensitive file system), 10/10 fixtures and 25/25 public tasks valid, oracle smoke runs
   resolved. This emulates the workflow; it is not a GitHub Actions run.
-- Live Anthropic API calls (no key). The SDK integration is tested offline.
+- Live Anthropic API calls (no key). The SDK integration is tested offline. Claude models were
+  run live through the `openrouter` backend instead (2026-11-04 pilot: 2 tasks x 3 agents on
+  `anthropic/claude-haiku-5.5`, all resolved, $0.0036); the OpenRouter tests themselves are offline.
 - The dashboard's rendering in a browser (the API and served assets are tested).
 - Model quality: real-model numbers come from the recorded benchmark runs in `docs/results/`, not
   from the test suite.

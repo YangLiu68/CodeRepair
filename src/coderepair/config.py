@@ -51,6 +51,10 @@ class Settings:
     anthropic_fallbacks: bool = True
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:7b"
+    openrouter_model: str = "anthropic/claude-sonnet-5.5"
+    openrouter_url: str = "https://openrouter.ai/api/v1"
+    openrouter_reasoning: str = ""
+    openrouter_data_collection: str = "deny"
     llm_timeout_s: int = 300
     fixture_test_timeout_s: int = 120
     limits: Limits = field(default_factory=Limits)
@@ -96,6 +100,19 @@ class Settings:
             anthropic_fallbacks=os.environ.get("CODEREPAIR_ANTHROPIC_FALLBACKS", "1") != "0",
             ollama_url=os.environ.get("CODEREPAIR_OLLAMA_URL", "http://127.0.0.1:11434"),
             ollama_model=os.environ.get("CODEREPAIR_OLLAMA_MODEL", "qwen2.5:7b"),
+            openrouter_model=os.environ.get(
+                "CODEREPAIR_OPENROUTER_MODEL", "anthropic/claude-sonnet-5.5"
+            ).strip()
+            or "anthropic/claude-sonnet-5.5",
+            openrouter_url=os.environ.get(
+                "CODEREPAIR_OPENROUTER_URL", "https://openrouter.ai/api/v1"
+            ).strip()
+            or "https://openrouter.ai/api/v1",
+            openrouter_reasoning=os.environ.get("CODEREPAIR_OPENROUTER_REASONING", "").strip(),
+            openrouter_data_collection=os.environ.get(
+                "CODEREPAIR_OPENROUTER_DATA_COLLECTION", "deny"
+            ).strip()
+            or "deny",
             llm_timeout_s=_env_int("CODEREPAIR_LLM_TIMEOUT_S", 300),
             fixture_test_timeout_s=_env_int("CODEREPAIR_FIXTURE_TEST_TIMEOUT_S", 120),
             cache_dir=_env_path("CODEREPAIR_CACHE_DIR", PROJECT_ROOT / ".cache"),

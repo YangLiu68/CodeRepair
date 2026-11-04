@@ -87,6 +87,7 @@ The walkthrough with real output is in [docs/DEMO.md](docs/DEMO.md).
 | `scripted` | **Mock.** Replays canned responses from a JSON file | Tests and adversarial demos |
 | `anthropic` | Claude via the official SDK (default `claude-opus-5-5`), structured JSON output | Needs `ANTHROPIC_API_KEY` or an `ant auth login` profile. Not run live here (no key) |
 | `ollama` | Local model via Ollama, JSON-schema output; `sample_index` > 0 samples at temperature 0.7 | Offline real runs; nothing leaves the machine |
+| `openrouter` | Hosted models through OpenRouter (default `anthropic/claude-sonnet-5.5`), strict JSON-schema output, routed only to endpoints that honour every parameter and (by default) neither store nor train on prompts. Sends `temperature`/`seed` only when the model accepts them (Claude models accept neither) and records the provider-reported cost of every call | Needs `OPENROUTER_API_KEY` in `.env`. Repository excerpts leave the machine. `bench --max-cost-usd` caps spending |
 
 Configuration is environment-only; see [.env.example](.env.example).
 

@@ -54,11 +54,11 @@ _LOOPBACK_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$
 
 class ProposalRequest(BaseModel):
     # The scripted backend reads a local file, so it is deliberately not exposed over HTTP.
-    backend: Literal["oracle", "anthropic", "ollama"] = "oracle"
+    backend: Literal["oracle", "anthropic", "ollama", "openrouter"] = "oracle"
 
 
 class RepairRequest(BaseModel):
-    backend: Literal["oracle", "anthropic", "ollama"] = "oracle"
+    backend: Literal["oracle", "anthropic", "ollama", "openrouter"] = "oracle"
     max_attempts: int = Field(default=3, ge=1, le=6)
     candidates: int = Field(default=1, ge=1, le=3)
     repro_test: bool = False

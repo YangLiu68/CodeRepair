@@ -12,15 +12,18 @@ from coderepair.benchmark.compare import (
     BenchBudget,
     classify_evaluation,
     classify_invalid,
+    config_fingerprint,
     run_benchmark,
 )
 from coderepair.benchmark.oracle import OracleBackend
+from coderepair.config import PROJECT_ROOT
+from coderepair.llm.base import BackendError
 from coderepair.llm.scripted import ScriptedBackend
 
 T01, T02 = task("t01_paginate_off_by_one"), task("t02_mutable_default_tags")
 
 
-def _bench(tmp_path, tasks, agents, backend_for, sandbox, **budget):
+def _bench(tmp_path, tasks, agents, backend_for, sandbox, max_cost_usd=None, **budget):
     return run_benchmark(
         [("fixtures", t) for t in tasks],
         agents,
@@ -28,8 +31,27 @@ def _bench(tmp_path, tasks, agents, backend_for, sandbox, **budget):
         sandbox,
         out_path=tmp_path / "bench.jsonl",
         budget=BenchBudget(**budget),
+        max_cost_usd=max_cost_usd,
         progress=lambda _line: None,
     )
+
+
+class _Priced:
+    """The oracle, billed like a hosted model and with a declared setting."""
+
+    name = "priced"
+    is_mock = True
+    model = "oracle-priced"
+
+    def __init__(self, t, cost=0.01, effort="low"):
+        self._inner = OracleBackend(t)
+        self.cost = cost
+        self.config = {"reasoning_effort": effort}
+
+    def complete(self, request):
+        response = self._inner.complete(request)
+        response.metadata = {**response.metadata, "cost_usd": self.cost}
+        return response
 
 
 def test_oracle_resolves_with_one_call_per_agent(sandbox, tmp_path):
@@ -118,6 +140,57 @@ def test_changed_task_content_invalidates_resumed_rows(sandbox, tmp_path, monkey
 
     _bench(tmp_path, [T01], ("direct",), counting, sandbox)
     assert len(calls) == 2  # metadata probe + a fresh run
+
+
+def test_spend_cap_stops_new_pairs_and_a_resume_finishes(sandbox, tmp_path):
+    agents = ("direct", "retrieval")
+    capped = _bench(tmp_path, [T01, T02], agents, _Priced, sandbox, max_cost_usd=0.015)
+    assert len(capped["rows"]) == 2  # $0.01 + $0.01 reaches the cap; no third pair starts
+    assert capped["meta"]["complete"] is False
+    assert capped["meta"]["spent_usd_this_run"] == 0.02
+    assert capped["summary"]["direct"]["cost_usd"] == 0.01
+    rows = [json.loads(line)["row"] for line in (tmp_path / "bench.jsonl").read_text().splitlines()]
+    assert [r["cost_usd"] for r in rows] == [0.01, 0.01]
+
+    resumed = _bench(tmp_path, [T01, T02], agents, _Priced, sandbox)
+    assert len(resumed["rows"]) == 4 and resumed["meta"]["complete"] is True
+    assert resumed["meta"]["spent_usd_this_run"] == 0.02  # only the two new pairs
+    assert "total $0.0400" in compare.render_markdown(
+        resumed["meta"], resumed["summary"], resumed["rows"]
+    )
+
+
+def test_billed_failures_count_toward_the_cost(sandbox, tmp_path):
+    class Truncating:
+        name, is_mock, model = "truncating", True, "m"
+
+        def complete(self, request):
+            raise BackendError("response truncated at max_tokens", cost_usd=0.003)
+
+    result = _bench(tmp_path, [T01], ("direct",), lambda _t: Truncating(), sandbox)
+    (row,) = result["rows"]
+    assert row.status == "error" and row.failure == "backend-error"
+    assert row.cost_usd == 0.003
+
+
+def test_backend_settings_enter_the_fingerprint_only_when_declared(sandbox, tmp_path):
+    # Results from backends without settings keep their fingerprints (and stay resumable).
+    for name, config in (("qwen2.5-3b", "00936b3aedfc"), ("qwen2.5-coder-3b", "c10754393838")):
+        summary = PROJECT_ROOT / "docs" / "results" / f"m5v2_ollama_{name}.summary.json"
+        meta = json.loads(summary.read_text())["meta"]
+        assert "backend_config" not in meta and config_fingerprint(meta) == config
+
+    low = _bench(tmp_path, [T01], ("direct",), _Priced, sandbox)
+    assert low["meta"]["backend_config"] == {"reasoning_effort": "low"}
+    calls = []
+
+    def high(t):
+        calls.append(t.id)
+        return _Priced(t, effort="high")
+
+    again = _bench(tmp_path, [T01], ("direct",), high, sandbox)
+    assert again["config"] != low["config"]
+    assert len(calls) == 2  # metadata probe + a fresh run: the "low" row was not reused
 
 
 def test_a_crashing_row_does_not_end_the_run(sandbox, tmp_path, monkeypatch):

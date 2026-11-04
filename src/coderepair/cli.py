@@ -416,6 +416,7 @@ def cmd_bench(args: argparse.Namespace, settings: Settings) -> int:
             budget=BenchBudget(max_calls=args.max_calls),
             limits=settings.limits,
             sandbox_limits=settings.sandbox_limits(),
+            max_cost_usd=args.max_cost_usd,
         )
     finally:
         unload = getattr(shared, "unload", None)
@@ -431,6 +432,9 @@ def cmd_bench(args: argparse.Namespace, settings: Settings) -> int:
     print()
     print(markdown)
     print(f"rows: {out}\nsummary: {summary_path}")
+    if not results["meta"]["complete"]:
+        print("incomplete: the spend cap stopped the run; re-run to resume", file=sys.stderr)
+        return 3
     return 0
 
 
@@ -685,6 +689,16 @@ def _bounded(low: int, high: int):
     return parse
 
 
+def _positive_float(value: str) -> float:
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"not a number: {value!r}") from exc
+    if not number > 0 or number == float("inf"):
+        raise argparse.ArgumentTypeError("must be a positive number")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="coderepair", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -787,6 +801,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-calls", type=_bounded(1, 10), default=3, help="model calls per agent per task"
     )
     p.add_argument("--out", help="results JSONL (resumable); summary and markdown go next to it")
+    p.add_argument(
+        "--max-cost-usd",
+        type=_positive_float,
+        help="start no new task once this run's provider-reported cost reaches this (USD)",
+    )
     p.set_defaults(func=cmd_bench)
 
     p = sub.add_parser(

@@ -1,5 +1,21 @@
 # Progress log
 
+## 2026-11-04 — OpenRouter backend, cost accounting, spend cap
+
+### Implemented
+
+| Area | Change |
+|---|---|
+| Backend | `openrouter` (`llm/openrouter_backend.py`): strict JSON-schema output; `provider.require_parameters` so no endpoint silently drops the schema; `data_collection: deny` by default; one free endpoint lookup per model decides whether `temperature`/`seed` are sent (Claude models on OpenRouter accept neither, so their calls use provider-default sampling, recorded per call); two retries with backoff for 408/429/5xx and unreachable server; billed failures (truncation, refusal, empty answer) carry their cost; key only from `OPENROUTER_API_KEY`, only over https, never in `repr` or errors; `sk-or-` keys added to secret redaction |
+| Benchmark | rows record the provider-reported `cost_usd` (including billed failures); per-agent and total cost in the summary and markdown; `bench --max-cost-usd` starts no new pair once the run's cost reaches the cap (exit 3, resumable); backend settings that change answers (`config`: reasoning effort, data collection, max tokens) enter the configuration fingerprint only when a backend declares them, so the Ollama results keep their fingerprints (pinned by a test) |
+
+### Verification
+
+| Check | Result |
+|---|---|
+| New offline tests | `test_openrouter_backend.py` 18 passed; bench cost/cap/fingerprint tests passed |
+| Live pilot (real API, 2026-11-04) | `anthropic/claude-haiku-5.5`, `t01_paginate_off_by_one` + `q03_find_first_in_sorted` x direct/retrieval/feedback, Seatbelt: 6/6 resolved on the first call, $0.0036 total. A pilot, not a benchmark result |
+
 ## 2026-10-15 (evening) — Third review, public subset v2, statistics, Docker for real, M5 v2
 
 ### Implemented

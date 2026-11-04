@@ -96,10 +96,12 @@ def test_redact_secrets_masks_known_formats():
             'password = "hunter2hunter2"',
             "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----",
             "x = compute_total(items)",
+            "OPENROUTER = sk-or-v1-" + "0f" * 32,
         ]
     )
     redacted, found = redact_secrets(text)
     assert "AKIAIOSFODNN7EXAMPLE" not in redacted
+    assert "0f" * 32 not in redacted
     assert "ghp_" + "a" * 36 not in redacted
     assert "hunter2hunter2" not in redacted
     assert "MIIEow" not in redacted
@@ -109,6 +111,7 @@ def test_redact_secrets_masks_known_formats():
         "github-token",
         "assignment",
         "private-key",
+        "openrouter-key",
     }
 
 

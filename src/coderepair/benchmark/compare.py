@@ -88,6 +88,8 @@ class BenchRow:
     detail: str = ""
     #: content hash of the task (repo, issue, tests, solution) the row was produced on
     task_hash: str = ""
+    #: provider-reported cost of the row's model calls (None when the backend reports none)
+    cost_usd: float | None = None
 
     def key(self) -> tuple[str, str]:
         return (self.task_id, self.agent)
@@ -98,6 +100,14 @@ def _tokens(attempts: list[AttemptResult]) -> tuple[int, int, float]:
     out = sum((a.response.output_tokens or 0) for a in attempts if a.response)
     lat = sum(a.response.latency_s for a in attempts if a.response)
     return inp, out, lat
+
+
+def _cost(attempts: list[AttemptResult]) -> float | None:
+    """Provider-reported cost, including failed calls that were billed (None if unreported)."""
+    costs = [a.response.metadata.get("cost_usd") for a in attempts if a.response]
+    costs += [a.backend_error.cost_usd for a in attempts if a.backend_error is not None]
+    known = [c for c in costs if isinstance(c, (int, float))]
+    return round(sum(known), 6) if known else None
 
 
 def classify_invalid(errors: list[str]) -> str:
@@ -231,6 +241,7 @@ def run_agent(
         f2p_passing="",
         p2p_broken=0,
         diff_lines=0,
+        cost_usd=_cost(attempts),
     )
     if overlay is None:
         row.failure = classify_invalid(last_errors)
@@ -281,7 +292,11 @@ def task_hash(task: TaskSpec) -> str:
 def config_fingerprint(meta: dict) -> str:
     # The agent list is deliberately not part of it: a row depends only on its own
     # agent, so adding an agent to an existing results file reuses the other rows.
+    # Backend settings that change answers count only when a backend declares them,
+    # so fingerprints of results from backends without settings stay as they were.
     keys = ("backend", "model", "budget", "sandbox", "sandbox_limits")
+    if meta.get("backend_config"):
+        keys += ("backend_config",)
     return hashlib.sha256(
         json.dumps({k: meta[k] for k in keys}, sort_keys=True).encode()
     ).hexdigest()[:12]
@@ -321,6 +336,9 @@ def summarize(rows: list[BenchRow]) -> dict:
             "failures": dict(Counter(r.failure for r in mine if r.failure)),
             "by_suite": by_suite,
         }
+        costs = [r.cost_usd for r in mine if r.cost_usd is not None]
+        if costs:
+            out[agent]["cost_usd"] = round(sum(costs), 4)
     return out
 
 
@@ -361,6 +379,14 @@ def render_markdown(meta: dict, summary: dict, rows: list[BenchRow]) -> str:
             f"{s['valid_patch']}/{s['tasks']} | {s['regressions']} | {s['mean_calls']} | "
             f"{s['mean_tokens']} | {s['median_llm_latency_s']} | {s['median_wall_s']} |"
         )
+    costs = {agent: s["cost_usd"] for agent, s in summary.items() if "cost_usd" in s}
+    if costs:
+        lines += [
+            "",
+            "Cost reported by the provider: "
+            + ", ".join(f"{agent} ${cost:.4f}" for agent, cost in costs.items())
+            + f"; total ${sum(costs.values()):.4f}.",
+        ]
     comparisons = paired(rows, list(summary))
     if comparisons:
         lines += [
@@ -390,6 +416,7 @@ def run_benchmark(
     budget: BenchBudget,
     limits: Limits | None = None,
     sandbox_limits: SandboxLimits | None = None,
+    max_cost_usd: float | None = None,
     progress=print,
 ) -> dict:
     """Run every (task, agent) pair, appending rows to ``out_path`` (JSONL) as they finish.
@@ -397,7 +424,10 @@ def run_benchmark(
     ``backend_for(task)`` returns the backend to use for a task (one shared
     instance for real models; a per-task instance for the oracle and scripted
     mocks). Re-running with the same configuration resumes: finished pairs are
-    skipped.
+    skipped. With ``max_cost_usd`` no new pair starts once the provider-reported
+    cost of this invocation reaches it, so the cap can be exceeded by at most one
+    pair (itself bounded by ``budget.max_tokens``); ``meta["complete"]`` says
+    whether every requested pair has a row.
     """
     backend = backend_for(tasks[0][1])
     meta = {
@@ -412,6 +442,9 @@ def run_benchmark(
         "date": datetime.now(UTC).isoformat(timespec="seconds"),
         "machine": f"{platform.system()} {platform.machine()} / Python {platform.python_version()}",
     }
+    backend_config = getattr(backend, "config", None)
+    if backend_config:
+        meta["backend_config"] = dict(backend_config)
     fingerprint = config_fingerprint(meta)
     hashes = {task.id: task_hash(task) for _, task in tasks}
     wanted = {(task.id, agent) for _, task in tasks for agent in agents}
@@ -432,11 +465,14 @@ def run_benchmark(
             ):
                 done[row.key()] = row
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    spent = 0.0
     with out_path.open("a", encoding="utf-8") as fh:
         for suite, task in tasks:
             for agent in agents:
                 if (task.id, agent) in done:
                     continue
+                if max_cost_usd is not None and spent >= max_cost_usd:
+                    break
                 try:
                     row = run_agent(
                         agent,
@@ -454,12 +490,23 @@ def run_benchmark(
                 done[row.key()] = row
                 fh.write(json.dumps({"config": fingerprint, "row": asdict(row)}) + "\n")
                 fh.flush()
+                spent += row.cost_usd or 0.0
+                cost = "" if row.cost_usd is None else f" cost=${row.cost_usd:.4f}"
                 progress(
                     f"{task.id:<34} {agent:<16} {row.status:<10} {row.failure:<16} "
                     f"calls={row.calls} tokens={row.input_tokens + row.output_tokens} "
-                    f"llm={row.llm_latency_s}s"
+                    f"llm={row.llm_latency_s}s{cost}"
                 )
     rows = [done[key] for key in sorted(done)]
+    meta["complete"] = wanted <= set(done)
+    meta["spent_usd_this_run"] = round(spent, 4)
+    if max_cost_usd is not None:
+        meta["max_cost_usd"] = max_cost_usd
+        if not meta["complete"]:
+            progress(
+                f"stopped at the spend cap: ${spent:.4f} of ${max_cost_usd:.2f}; "
+                f"{len(wanted - set(done))} pairs not run (re-run to resume)"
+            )
     return {
         "meta": meta,
         "config": fingerprint,

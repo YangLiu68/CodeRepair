@@ -11,7 +11,7 @@ from .config import Settings
 from .llm.base import BackendError, LLMBackend
 from .llm.scripted import ScriptedBackend
 
-BACKEND_NAMES = ("oracle", "scripted", "anthropic", "ollama")
+BACKEND_NAMES = ("oracle", "scripted", "anthropic", "ollama", "openrouter")
 MOCK_BACKENDS = frozenset({"oracle", "scripted"})
 
 
@@ -54,5 +54,15 @@ def make_backend(
 
         return OllamaBackend(
             settings.ollama_model, base_url=settings.ollama_url, timeout_s=settings.llm_timeout_s
+        )
+    if name == "openrouter":
+        from .llm.openrouter_backend import OpenRouterBackend
+
+        return OpenRouterBackend(
+            settings.openrouter_model,
+            base_url=settings.openrouter_url,
+            reasoning_effort=settings.openrouter_reasoning,
+            data_collection=settings.openrouter_data_collection,
+            timeout_s=settings.llm_timeout_s,
         )
     raise BackendError(f"unknown backend {name!r}; choose from {', '.join(BACKEND_NAMES)}")
