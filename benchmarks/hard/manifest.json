@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "tasks": {
+    "h01_cycle_anchor_drift": {
+      "repo": "0eaef5056b5a5e093368f8b7e4c44bcde97c4cbfb34615c239fc2f959424ac1f",
+      "issue": "45a48bc2ac0d4a5bff4498509566d152ff9d0b7b651ce74c3038a88f1cfb1892",
+      "solution": "6ee99c5fc37924c04d460fc1ce9addaf059207b846d2ae842cd73081ad320f81",
+      "hidden_tests": "be2de68f62dd3db886cacfeb03ebf01635085f539223507458bb1a3e6706a58e",
+      "task_toml": "f49467db60c83309f550bffe01e6192298b9530cd0999beefcbda08eab7f764c"
+    },
+    "h02_credit_allocation_sign": {
+      "repo": "3cad21dd78dbb87cfa957a5cfd4c8e12fe0cfcef37c912fe8100749511bd5292",
+      "issue": "1bf42bcb755868c498551af8f60c1252d0732acba15c9f65b2f04bb33508fd09",
+      "solution": "754cd2368239c700de140b801e136d091623bdc23b87827bc6e91f8e15808667",
+      "hidden_tests": "9792c1b2a6f73fe0c4361888f9fbdf8308b929ea48d950f3a65fc5ea09a25936",
+      "task_toml": "4e4b548fd65cade23f72f8e1d18c91b010cc0969998c5f3a7c920c7ce50a6b7e"
+    },
+    "h03_vat_inclusive_discount": {
+      "repo": "888e627ecbfdde243ca375bf160eac2c93f5a72dc097990e37c6edbf6899681e",
+      "issue": "e74e3b303152048d682418c7772aa285f928030d8714800406df9efd416246c5",
+      "solution": "f6d600cc772a849fd12ff280bbc8ba2749fb621a3a090bb0897d6dc962df23ff",
+      "hidden_tests": "4475c171d9e7e602d296ae7ddb8cfb2215cb8c19a633fb1cbcdf76efc57e3220",
+      "task_toml": "edfc1af87f6e1966fa3a8de7815d493f2e698dcb28642b1d61e390f081524102"
+    },
+    "h04_volume_tier_boundary": {
+      "repo": "e183b51c620aae24bd609cbbc2f3659bd263cadf6675237779d7df6774d3a5d2",
+      "issue": "845a5cc99979c5abe10d2d6cf9750dddbc82ab92f4fc667b1fb4383fe579eae6",
+      "solution": "713789e413652403d1b66a6bc5a18ea495ba755a529b3bb9aef9d777aa520de2",
+      "hidden_tests": "9af9cd479153749e43ff8389236986e32c3501729cb8a299fb5923dc875cf784",
+      "task_toml": "f266ec7396fbefe22da27e96c076b81774ed91cfdc10ee1262aa836f05560596"
+    },
+    "h05_fx_intermediate_rounding": {
+      "repo": "94fb60cc3fe3fbf4b73b1ad4a8c291130315c337b5a93772a128ee5e36a4f1b9",
+      "issue": "43f6b02edaf521eed556387e0a707b386ee22c38d9c244ce03ca5e7c9943ca32",
+      "solution": "ef2b1cd3988e9778cd79d1afb39700175ed16701b27d649fe79739f6e339848f",
+      "hidden_tests": "ed4d2112f511f337cae1fe78f61c58748b2a5426e866794373ce1852871397a1",
+      "task_toml": "7e31cdcb7fde0dd9c63a72b293e1e0c6b49fcb8569571a50c6243869e6c201df"
+    },
+    "h06_csv_formula_injection": {
+      "repo": "4144ed194ffa705eb18654e917c722c9f6fc2faf943075fecc986e3f60a7924f",
+      "issue": "56d2d81d02b2a8187cc70556bd889381d28b95a69396972e7f1b623ae97afc91",
+      "solution": "b6b25c050e575bf9d3d66cb0abf4e27bf03c6049fc470b322c1895cd2f1c1f31",
+      "hidden_tests": "9c736250b180d6ca05f921d7517f343310c5e36e0db8b3a73a5f606e32d6752b",
+      "task_toml": "d22fe0e1bc0a95bc7094df0df05aa7f783d345af660eca206860effd50e41019"
+    },
+    "h07_coupon_counts_invoices": {
+      "repo": "b826d15d704d958e11ebe9f1cad7412580e6f77c8672fa25cc0c3296cb60cc96",
+      "issue": "f8ae28311e8c70184b325e3f4216aacb282cf7ad778207ca8ba3a0101cd47732",
+      "solution": "bee8fe455131d187019c58cf48d232b9fc8fd9a4a518742f321d9c9bab1b7a4e",
+      "hidden_tests": "a20702525f382826d7d1ec0172dd1147d9b23860546b5a66aab52df8538bc6b7",
+      "task_toml": "a0cfffe965f0d37c384289e28cbf703d578a1607435ad3a74fd13c332173af67"
+    },
+    "h08_dunning_recovery_resets_cycle": {
+      "repo": "edb76116fdb092b5378e59a74b757da01363da40ec328b62196262b3798b1bf1",
+      "issue": "99abd7bd1e66f53b26111e509555e40668db8c55f5bbb0327ce372219064688c",
+      "solution": "35c92be85ac81657ba4629301458c9e90adb68f5f0fa31d4fc33c9640214de97",
+      "hidden_tests": "223a35ded7d5700cc02044a5f90f56275d1649dcf37965052b30d6374e519f43",
+      "task_toml": "c9a001c2d28883df0868e84eb9ea75809d18ee865bab5723525b491bfa706a3d"
+    },
+    "h09_ledger_currency_netting": {
+      "repo": "af71f03ae5be76adbffe7f8ca039789b1de352f382d9721615846840cd8060bb",
+      "issue": "68b09aae639edfc5dce57024a5c9c7a405ea02fb6e6b345f50ee41aefe4ed8a7",
+      "solution": "5dac4963cb9d99b9b305dfe61bfc81dabf715ebf4c0244394f5b2be349de2faa",
+      "hidden_tests": "6d10a2480af933f0d5cb6487fc11c387e956d2426862f0266ac94ee1f1c22150",
+      "task_toml": "52623b0447229d041eae8b6a6df48c2c50c426e66eca7ac7730327e6bd34c558"
+    }
+  }
+}

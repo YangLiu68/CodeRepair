@@ -1,0 +1,51 @@
+diff --git a/billing/discounts.py b/billing/discounts.py
+--- a/billing/discounts.py
++++ b/billing/discounts.py
+@@ -56,26 +56,22 @@
+     coupon: Coupon
+     #: index of the billing period in which the coupon was redeemed
+     first_period: int
+-    #: invoices discounted so far
+-    uses: int = 0
+ 
+     @property
+-    def max_uses(self) -> int | None:
+-        """How many invoices the coupon discounts (None: no limit)."""
++    def last_period(self) -> int | None:
++        """Index of the last discounted period (None: never ends)."""
+         if self.coupon.duration == "forever":
+             return None
+         if self.coupon.duration == "once":
+-            return 1
+-        return self.coupon.duration_periods
++            return self.first_period
++        return self.first_period + self.coupon.duration_periods - 1
+ 
+     def applies_to(self, period_index: int) -> bool:
+         """Whether an invoice for period ``period_index`` gets this coupon's discount."""
+         if period_index < self.first_period:
+             return False
+-        return self.max_uses is None or self.uses < self.max_uses
+-
+-    def record_use(self) -> None:
+-        self.uses += 1
++        last = self.last_period
++        return last is None or period_index <= last
+ 
+ 
+ def discount_amounts(coupons: Sequence[Coupon], amounts: Sequence[Money]) -> list[Money]:
+diff --git a/billing/subscriptions.py b/billing/subscriptions.py
+--- a/billing/subscriptions.py
++++ b/billing/subscriptions.py
+@@ -276,10 +276,7 @@
+ 
+     def _issue(self, lines: list[InvoiceLine], kind: str, on: date) -> Invoice:
+         index = self.period_index
+-        applied = [r for r in self.redemptions if r.applies_to(index)]
+-        for redemption in applied:
+-            redemption.record_use()
+-        coupons = tuple(r.coupon for r in applied)
++        coupons = tuple(r.coupon for r in self.redemptions if r.applies_to(index))
+         invoice = Invoice(
+             self.customer_id,
+             self.plan.currency,

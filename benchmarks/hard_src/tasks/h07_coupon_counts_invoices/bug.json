@@ -1,0 +1,12 @@
+[
+  {
+    "path": "billing/discounts.py",
+    "old": "@dataclass\nclass Redemption:\n    coupon: Coupon\n    #: index of the billing period in which the coupon was redeemed\n    first_period: int\n\n    @property\n    def last_period(self) -> int | None:\n        \"\"\"Index of the last discounted period (None: never ends).\"\"\"\n        if self.coupon.duration == \"forever\":\n            return None\n        if self.coupon.duration == \"once\":\n            return self.first_period\n        return self.first_period + self.coupon.duration_periods - 1\n\n    def applies_to(self, period_index: int) -> bool:\n        \"\"\"Whether an invoice for period ``period_index`` gets this coupon's discount.\"\"\"\n        if period_index < self.first_period:\n            return False\n        last = self.last_period\n        return last is None or period_index <= last\n",
+    "new": "@dataclass\nclass Redemption:\n    coupon: Coupon\n    #: index of the billing period in which the coupon was redeemed\n    first_period: int\n    #: invoices discounted so far\n    uses: int = 0\n\n    @property\n    def max_uses(self) -> int | None:\n        \"\"\"How many invoices the coupon discounts (None: no limit).\"\"\"\n        if self.coupon.duration == \"forever\":\n            return None\n        if self.coupon.duration == \"once\":\n            return 1\n        return self.coupon.duration_periods\n\n    def applies_to(self, period_index: int) -> bool:\n        \"\"\"Whether an invoice for period ``period_index`` gets this coupon's discount.\"\"\"\n        if period_index < self.first_period:\n            return False\n        return self.max_uses is None or self.uses < self.max_uses\n\n    def record_use(self) -> None:\n        self.uses += 1\n"
+  },
+  {
+    "path": "billing/subscriptions.py",
+    "old": "        coupons = tuple(r.coupon for r in self.redemptions if r.applies_to(index))\n",
+    "new": "        applied = [r for r in self.redemptions if r.applies_to(index)]\n        for redemption in applied:\n            redemption.record_use()\n        coupons = tuple(r.coupon for r in applied)\n"
+  }
+]

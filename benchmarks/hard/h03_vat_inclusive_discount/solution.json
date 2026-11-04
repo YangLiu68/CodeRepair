@@ -1,0 +1,10 @@
+{
+  "summary": "Inclusive VAT, like exclusive tax, is computed on each line's amount after its discount.",
+  "edits": [
+    {
+      "path": "billing/invoice.py",
+      "old": "        payable = [a - d for a, d in zip(amounts, discounts)]\n        if self.tax_rate.inclusive:\n            # inclusive prices already contain their tax: take it from the listed price\n            taxes = [line_tax(a, self.tax_rate) for a in amounts]\n        else:\n            taxes = [line_tax(p, self.tax_rate) for p in payable]\n",
+      "new": "        payable = [a - d for a, d in zip(amounts, discounts)]\n        taxes = [line_tax(p, self.tax_rate) for p in payable]\n"
+    }
+  ]
+}

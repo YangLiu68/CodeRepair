@@ -1,0 +1,7 @@
+[
+  {
+    "path": "billing/fx.py",
+    "old": "        if money.currency == target:\n            return money.rounded()\n        return Money(money.amount * self.rate(money.currency, target), target).rounded()\n",
+    "new": "        if money.currency == target:\n            return money.rounded()\n        source = money.currency\n        direct = (source, target) in self._pairs or (target, source) in self._pairs\n        if direct or self.base in (source, target):\n            return Money(money.amount * self.rate(source, target), target).rounded()\n        # no direct rate: convert through the base currency\n        return self.convert(self.to_base(money), target)\n"
+  }
+]

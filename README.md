@@ -48,7 +48,7 @@ issue + repo ─► retrieval with reasons ─► model ─► validated edits �
 | M2 disposable, network-less test sandbox with abuse probes | done (Seatbelt on macOS; Docker run for real under Colima: probes 15/15, 35/35 tasks valid) |
 | M3 iterative repair loop | done |
 | M4 candidates, reproduction tests, lint/type/security checks, human approval | done |
-| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done: two local 3B models plus an ablation, and two Claude models through OpenRouter (see below) |
+| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done: two local 3B models plus an ablation, two Claude models through OpenRouter, and a 9-task hard tier (see below) |
 | M6 licensed public subset (QuixBugs) with leakage controls | done |
 | M7 dashboard, CI, threat model, docs, demo | done (GitHub Actions has not run: no remote; its steps pass in a local Linux VM on Python 3.11–3.13) |
 
@@ -62,12 +62,13 @@ Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/). Test execution ne
 ```bash
 uv sync --all-extras
 uv run coderepair sandbox status && uv run coderepair sandbox selftest
-uv run coderepair tasks                                   # 10 fixtures + 25 public tasks
+uv run coderepair tasks                                   # 10 fixtures, 25 public, 9 hard tasks
 uv run coderepair repair t01_paginate_off_by_one --evaluate          # oracle mock by default
 uv run coderepair repair t02_mutable_default_tags --backend scripted \
     --script docs/demo/repro_t02.json --candidates 2 --repro-test   # reproduction-test ranking
 uv run coderepair review <run-id> && uv run coderepair approve <run-id> --reviewer you
-uv run coderepair bench --backend oracle --tasks t01_paginate_off_by_one q06_gcd
+uv run coderepair bench --backend oracle --suite all --tasks t01_paginate_off_by_one q06_gcd
+uv run coderepair bench --backend openrouter --suite hard --max-cost-usd 1   # needs OPENROUTER_API_KEY
 uv run coderepair bench-report docs/results/m5v2_*.jsonl          # CIs + paired tests, pooled by task
 uv run coderepair serve                                   # dashboard on http://127.0.0.1:8000
 uv run pytest -rs
@@ -113,6 +114,14 @@ current hosted models to separate the designs**. The first-party fixtures satura
 public QuixBugs tasks, so this is not only memorisation. Provider-reported cost for the 105 rows:
 $0.054 (Haiku) and $0.76 (Sonnet), which matches the change in the key's usage.
 
+**Hard tier** (9 tasks on one shared 80k-character billing library, with misleading issues and
+regression traps; see [BENCHMARK.md](BENCHMARK.md)): both Claude models resolve 8/9 with
+`direct`, 6/9 with `retrieval` and 6/9 with `feedback`, failing on exactly the same tasks. Every
+failure is missing context: the file to fix was not in the prompt (retrieval's top three missed it
+three times; `direct`'s 60k-character window missed it once), and the model returned no edit
+rather than guess. With the right file in view, both models fixed every bug on the first call,
+traps included. The weakest component is retrieval, not reasoning or test feedback.
+
 The 3B models are too weak to rank the agents: no pairwise difference is significant (smallest
 p = 0.125, exact paired test by task over both models), so this does **not** show that test
 feedback resolves more issues. What the run does show: at temperature 0 the test-feedback loop
@@ -154,6 +163,7 @@ src/coderepair/
   cli.py api.py static/                                                      CLI and dashboard (M7)
 benchmarks/tasks/   10 first-party seeded-bug tasks
 benchmarks/public/  25 QuixBugs-derived tasks (MIT; see LICENSE_NOTES.md)
+benchmarks/hard/    9 hard-tier tasks, built from benchmarks/hard_src by build-hard-suite
 scripts/            public-subset builder, M1 smoke run
 docs/               demo, demo inputs, recorded results
 tests/              unit, security, sandbox, loop, review, public-suite and API tests

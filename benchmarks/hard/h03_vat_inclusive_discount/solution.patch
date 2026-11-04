@@ -1,0 +1,16 @@
+diff --git a/billing/invoice.py b/billing/invoice.py
+--- a/billing/invoice.py
++++ b/billing/invoice.py
+@@ -103,11 +103,7 @@
+         ]
+         discounts = discount_amounts(self.coupons, eligible) if self.coupons else [zero] * len(amounts)
+         payable = [a - d for a, d in zip(amounts, discounts)]
+-        if self.tax_rate.inclusive:
+-            # inclusive prices already contain their tax: take it from the listed price
+-            taxes = [line_tax(a, self.tax_rate) for a in amounts]
+-        else:
+-            taxes = [line_tax(p, self.tax_rate) for p in payable]
++        taxes = [line_tax(p, self.tax_rate) for p in payable]
+         subtotal = Money.total(amounts, currency)
+         discount = Money.total(discounts, currency)
+         tax = Money.total(taxes, currency)

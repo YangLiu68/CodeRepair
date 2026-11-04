@@ -1,0 +1,11 @@
+category = "state-across-modules"
+difficulty = "hard"
+issue_style = "support report about one scenario (upgrade during a repeating coupon); the general rule lives in the discounts module; no failing test"
+summary = "A redemption covers billing periods first_period .. first_period + n - 1 by period index; invoices are no longer counted."
+seeded_bug = "Redemption counts discounted invoices (record_use on every invoice, proration included) instead of covering billing periods"
+fail_to_pass = [
+    "tests/test_hidden_coupon_periods.py::test_hidden_upgrade_does_not_use_up_a_repeating_coupon",
+    "tests/test_hidden_coupon_periods.py::test_hidden_coupon_redeemed_mid_period_counts_that_period",
+    "tests/test_hidden_coupon_periods.py::test_hidden_once_coupon_covers_every_invoice_of_its_period",
+    "tests/test_hidden_coupon_periods.py::test_hidden_redemption_covers_periods_not_calls",
+]

@@ -1,0 +1,10 @@
+category = "boundary-condition"
+difficulty = "medium"
+issue_style = "billing-ops report with a misleading hypothesis (blames usage periods); no failing test"
+summary = "A quantity exactly on a tier's inclusive up_to bound is priced in that tier."
+seeded_bug = "pricing.tier_for compares with < instead of <=, so a quantity on a tier bound gets the next tier's price"
+fail_to_pass = [
+    "tests/test_hidden_tiers.py::test_hidden_volume_quantity_on_a_tier_bound",
+    "tests/test_hidden_tiers.py::test_hidden_usage_exactly_on_a_bound_is_billed_in_its_tier",
+    "tests/test_hidden_tiers.py::test_hidden_flat_fee_tier_includes_its_bound",
+]

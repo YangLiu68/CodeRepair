@@ -1,0 +1,10 @@
+category = "date-arithmetic"
+difficulty = "medium"
+issue_style = "support escalation; symptom in renewal dates, root cause in the billing-cycle module; no failing test"
+summary = "next_period derives the next period from the cycle's period index instead of stepping from the previous period's (clamped) end, so short months no longer move the billing day."
+seeded_bug = "BillingCycle.next_period steps one interval from current.end, so a clamped end (Feb 28) becomes the new billing day"
+fail_to_pass = [
+    "tests/test_hidden_billing_dates.py::test_hidden_month_end_anchor_returns_to_the_31st",
+    "tests/test_hidden_billing_dates.py::test_hidden_renewals_keep_the_signup_day",
+    "tests/test_hidden_billing_dates.py::test_hidden_quarterly_cycle_across_a_leap_february",
+]

@@ -1,0 +1,22 @@
+diff --git a/billing/money.py b/billing/money.py
+--- a/billing/money.py
++++ b/billing/money.py
+@@ -142,13 +142,15 @@
+             raise ValueError("weights must be non-negative and not all zero")
+         total_weight = sum(weights)
+         minor = self.minor
+-        shares = [minor * w / total_weight for w in weights]
++        sign = -1 if minor < 0 else 1
++        units = abs(minor)
++        shares = [units * w / total_weight for w in weights]
+         parts = [int(share) for share in shares]
+-        leftover = minor - sum(parts)
++        leftover = units - sum(parts)
+         by_remainder = sorted(range(len(shares)), key=lambda i: (-(shares[i] - parts[i]), i))
+         for index in by_remainder[:leftover]:
+             parts[index] += 1
+-        return [Money.from_minor(part, self.currency) for part in parts]
++        return [Money.from_minor(sign * part, self.currency) for part in parts]
+ 
+     def split(self, count: int) -> list[Money]:
+         """``count`` equal parts that add up exactly (``allocate`` with equal weights)."""

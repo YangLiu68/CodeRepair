@@ -1,0 +1,12 @@
+[
+  {
+    "path": "billing/money.py",
+    "old": "        minor = self.minor\n        sign = -1 if minor < 0 else 1\n        units = abs(minor)\n        shares = [units * w / total_weight for w in weights]\n        parts = [int(share) for share in shares]\n        leftover = units - sum(parts)\n",
+    "new": "        minor = self.minor\n        shares = [minor * w / total_weight for w in weights]\n        parts = [int(share) for share in shares]\n        leftover = minor - sum(parts)\n"
+  },
+  {
+    "path": "billing/money.py",
+    "old": "        return [Money.from_minor(sign * part, self.currency) for part in parts]\n",
+    "new": "        return [Money.from_minor(part, self.currency) for part in parts]\n"
+  }
+]

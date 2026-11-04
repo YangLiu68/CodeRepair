@@ -1,0 +1,11 @@
+category = "tax-calculation"
+difficulty = "medium"
+issue_style = "accountant's report with an example and the failing test id"
+summary = "Inclusive VAT, like exclusive tax, is computed on each line's amount after its discount."
+seeded_bug = "Invoice.totals takes inclusive VAT from the listed (pre-discount) line amounts"
+fail_to_pass = [
+    "tests/test_invoice.py::test_inclusive_vat_is_computed_on_the_discounted_price",
+    "tests/test_hidden_vat.py::test_hidden_inclusive_vat_on_several_discounted_lines",
+    "tests/test_hidden_vat.py::test_hidden_inclusive_vat_with_an_amount_off_coupon",
+    "tests/test_hidden_vat.py::test_hidden_ledger_books_the_vat_actually_contained",
+]

@@ -1,0 +1,29 @@
+diff --git a/billing/dunning.py b/billing/dunning.py
+--- a/billing/dunning.py
++++ b/billing/dunning.py
+@@ -74,7 +74,7 @@
+         self.attempts.append(attempt)
+         if succeeded:
+             self.invoice.record_payment(self.invoice.amount_due)
+-            self.subscription.reactivate(day)
++            self.subscription.recover(day)
+             self.subscription.events.publish(
+                 "invoice.paid", day, self.subscription.id, number=self.invoice.number
+             )
+diff --git a/billing/subscriptions.py b/billing/subscriptions.py
+--- a/billing/subscriptions.py
++++ b/billing/subscriptions.py
+@@ -200,6 +200,13 @@
+         self.status = "past_due"
+         self.events.publish("subscription.updated", on, self.id, status="past_due")
+ 
++    def recover(self, on: date) -> None:
++        """A late payment succeeded: back to active, same billing dates, no new invoice."""
++        if self.status != "past_due":
++            raise InvalidTransition(f"cannot recover a {self.status} subscription")
++        self.status = "active"
++        self.events.publish("subscription.updated", on, self.id, status="active")
++
+     def mark_unpaid(self, on: date) -> None:
+         if self.status != "past_due":
+             raise InvalidTransition(f"cannot mark a {self.status} subscription unpaid")

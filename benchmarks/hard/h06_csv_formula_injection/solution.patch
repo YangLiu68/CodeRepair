@@ -1,0 +1,40 @@
+diff --git a/billing/export.py b/billing/export.py
+--- a/billing/export.py
++++ b/billing/export.py
+@@ -20,7 +20,7 @@
+ from .invoice import Invoice
+ 
+ HEADER = ("number", "issued", "customer", "description", "quantity", "amount", "currency")
+-FORMULA_TRIGGERS = ("=",)
++FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+ 
+ 
+ def neutralize(text: str) -> str:
+@@ -39,16 +39,17 @@
+         issued = invoice.issued_at.date().isoformat() if invoice.issued_at else ""
+         customer = names.get(invoice.customer_id, invoice.customer_id)
+         for line in invoice.lines:
+-            cells = [
+-                invoice.number,
+-                issued,
+-                customer,
+-                line.description,
+-                str(line.quantity),
+-                str(line.amount.rounded().amount),
+-                invoice.currency,
+-            ]
+-            rows.append([neutralize(cell) for cell in cells])
++            rows.append(
++                [
++                    neutralize(invoice.number),
++                    issued,
++                    neutralize(customer),
++                    neutralize(line.description),
++                    str(line.quantity),
++                    str(line.amount.rounded().amount),
++                    invoice.currency,
++                ]
++            )
+     return rows
+ 
+ 

@@ -42,9 +42,12 @@ from .security import PolicyError, display_safe
 
 FIRST_PARTY_TASKS = PROJECT_ROOT / "benchmarks" / "tasks"
 PUBLIC_TASKS = PROJECT_ROOT / "benchmarks" / "public"
+HARD_TASKS = PROJECT_ROOT / "benchmarks" / "hard"
+HARD_SOURCES = PROJECT_ROOT / "benchmarks" / "hard_src"
 SUITES = {
     "fixtures": (FIRST_PARTY_TASKS, PROJECT_ROOT / "benchmarks" / "manifest.json"),
     "public": (PUBLIC_TASKS, PUBLIC_TASKS / "manifest.json"),
+    "hard": (HARD_TASKS, HARD_TASKS / "manifest.json"),
 }
 MANIFEST_PATH = PROJECT_ROOT / "benchmarks" / "manifest.json"
 
@@ -381,7 +384,7 @@ def cmd_bench(args: argparse.Namespace, settings: Settings) -> int:
     if unknown:
         print(f"error: unknown agent(s) {unknown}; choose from {ALL_AGENTS}", file=sys.stderr)
         return 2
-    chosen = list(SUITES) if args.suite == "all" else [args.suite]
+    chosen = args.suite
     tasks = []
     for suite in chosen:
         if SUITES[suite][0].is_dir():
@@ -577,7 +580,7 @@ def cmd_sandbox(args: argparse.Namespace, settings: Settings) -> int:
 def cmd_validate_fixtures(args: argparse.Namespace, settings: Settings) -> int:
     """Check benchmark tasks. First-party fixtures may run on the host (trusted);
     the public suite contains third-party code and always runs in a sandbox."""
-    chosen = list(SUITES) if args.suite == "all" else [args.suite]
+    chosen = args.suite
     failures = 0
     results = []
     manifest_problems = []
@@ -626,6 +629,23 @@ def cmd_validate_fixtures(args: argparse.Namespace, settings: Settings) -> int:
         if not manifest_problems and not args.tasks:
             print("manifest: up to date")
     return 1 if failures or manifest_problems else 0
+
+
+def cmd_build_hard_suite(args: argparse.Namespace, settings: Settings) -> int:
+    """Rebuild benchmarks/hard from benchmarks/hard_src (runs the first-party tests on the host)."""
+    from .benchmark.hard_suite import build_suite
+
+    try:
+        built = build_suite(HARD_SOURCES, HARD_TASKS, timeout_s=settings.fixture_test_timeout_s)
+    except TaskError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    tasks = list_tasks(HARD_TASKS)
+    for task in tasks:
+        write_solution_patch(task)
+    write_manifest(tasks, SUITES["hard"][1])
+    print(f"hard: built {len(built)} tasks, solution patches and {SUITES['hard'][1].name}")
+    return 0
 
 
 def cmd_build_fixtures(args: argparse.Namespace, settings: Settings) -> int:
@@ -687,6 +707,19 @@ def _bounded(low: int, high: int):
         return number
 
     return parse
+
+
+def _suites(value: str) -> list[str]:
+    """``all`` or a comma-separated list of suite names."""
+    if value == "all":
+        return list(SUITES)
+    names = [v.strip() for v in value.split(",") if v.strip()]
+    unknown = [n for n in names if n not in SUITES]
+    if unknown or not names:
+        raise argparse.ArgumentTypeError(
+            f"choose 'all' or a comma-separated list of {', '.join(SUITES)}"
+        )
+    return list(dict.fromkeys(names))
 
 
 def _positive_float(value: str) -> float:
@@ -787,7 +820,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_evaluate)
 
     p = sub.add_parser("bench", help="comparative benchmark: direct vs retrieval vs feedback")
-    p.add_argument("--suite", choices=("fixtures", "public", "all"), default="fixtures")
+    p.add_argument(
+        "--suite",
+        type=_suites,
+        default=["fixtures"],
+        help="all, or a comma-separated list of: fixtures, public, hard (default: fixtures)",
+    )
     p.add_argument("--tasks", nargs="*")
     p.add_argument(
         "--agents",
@@ -848,7 +886,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("tasks", nargs="*")
     p.add_argument("--json", action="store_true")
-    p.add_argument("--suite", choices=("fixtures", "public", "all"), default="fixtures")
+    p.add_argument(
+        "--suite",
+        type=_suites,
+        default=["fixtures"],
+        help="all, or a comma-separated list of: fixtures, public, hard (default: fixtures)",
+    )
     p.add_argument(
         "--sandbox",
         choices=SANDBOX_NAMES,
@@ -858,6 +901,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("build-fixtures", help="regenerate solution.patch files and the manifest")
     p.set_defaults(func=cmd_build_fixtures)
+
+    p = sub.add_parser(
+        "build-hard-suite",
+        help="rebuild benchmarks/hard from benchmarks/hard_src (runs first-party tests on host)",
+    )
+    p.set_defaults(func=cmd_build_hard_suite)
 
     p = sub.add_parser("eval-retrieval", help="measure retrieval recall against gold files")
     p.add_argument("--json", action="store_true")

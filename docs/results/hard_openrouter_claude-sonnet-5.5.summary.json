@@ -1,0 +1,154 @@
+{
+  "meta": {
+    "kind": "comparative benchmark",
+    "backend": "openrouter",
+    "model": "anthropic/claude-sonnet-5.5",
+    "is_mock": false,
+    "budget": {
+      "max_calls": 3,
+      "max_tokens": 60000,
+      "max_wall_s": 900.0
+    },
+    "agents": [
+      "direct",
+      "retrieval",
+      "feedback"
+    ],
+    "sandbox": "seatbelt",
+    "sandbox_limits": {
+      "wall_timeout_s": 60.0,
+      "cpu_seconds": 60,
+      "memory_mb": 512,
+      "tmp_mb": 64,
+      "disk_write_mb": 256,
+      "max_file_mb": 32,
+      "max_open_files": 256,
+      "max_processes": 64,
+      "output_bytes": 65536,
+      "output_hard_cap_bytes": 8000000
+    },
+    "date": "2026-11-04T02:56:44+00:00",
+    "machine": "Darwin arm64 / Python 3.12.10",
+    "backend_config": {
+      "reasoning_effort": "provider-default",
+      "data_collection": "deny",
+      "max_tokens": 16000
+    },
+    "complete": true,
+    "spent_usd_this_run": 1.3259,
+    "max_cost_usd": 2.0
+  },
+  "config": "63cfd3d4c7ff",
+  "summary": {
+    "direct": {
+      "tasks": 9,
+      "resolved": 8,
+      "resolve_rate": 0.889,
+      "resolve_ci95": [
+        0.565,
+        0.98
+      ],
+      "pass_at_1": 8,
+      "valid_patch": 8,
+      "regressions": 0,
+      "mean_calls": 1.22,
+      "mean_tokens": 28845,
+      "median_llm_latency_s": 5.5,
+      "median_wall_s": 6.2,
+      "failures": {
+        "no-edits": 1
+      },
+      "by_suite": {
+        "hard": {
+          "tasks": 9,
+          "resolved": 8
+        }
+      },
+      "cost_usd": 0.5694
+    },
+    "retrieval": {
+      "tasks": 9,
+      "resolved": 6,
+      "resolve_rate": 0.667,
+      "resolve_ci95": [
+        0.354,
+        0.879
+      ],
+      "pass_at_1": 6,
+      "valid_patch": 6,
+      "regressions": 0,
+      "mean_calls": 1.67,
+      "mean_tokens": 17061,
+      "median_llm_latency_s": 6.8,
+      "median_wall_s": 7.6,
+      "failures": {
+        "no-edits": 3
+      },
+      "by_suite": {
+        "hard": {
+          "tasks": 9,
+          "resolved": 6
+        }
+      },
+      "cost_usd": 0.3721
+    },
+    "feedback": {
+      "tasks": 9,
+      "resolved": 6,
+      "resolve_rate": 0.667,
+      "resolve_ci95": [
+        0.354,
+        0.879
+      ],
+      "pass_at_1": 6,
+      "valid_patch": 6,
+      "regressions": 0,
+      "mean_calls": 1.67,
+      "mean_tokens": 17261,
+      "median_llm_latency_s": 5.5,
+      "median_wall_s": 9.8,
+      "failures": {
+        "no-edits": 3
+      },
+      "by_suite": {
+        "hard": {
+          "tasks": 9,
+          "resolved": 6
+        }
+      },
+      "cost_usd": 0.3843
+    }
+  },
+  "paired": [
+    {
+      "a": "direct",
+      "b": "retrieval",
+      "tasks": 9,
+      "both": 5,
+      "only_a": 3,
+      "only_b": 1,
+      "neither": 0,
+      "p_value": 0.625
+    },
+    {
+      "a": "direct",
+      "b": "feedback",
+      "tasks": 9,
+      "both": 5,
+      "only_a": 3,
+      "only_b": 1,
+      "neither": 0,
+      "p_value": 0.625
+    },
+    {
+      "a": "retrieval",
+      "b": "feedback",
+      "tasks": 9,
+      "both": 6,
+      "only_a": 0,
+      "only_b": 0,
+      "neither": 3,
+      "p_value": 1.0
+    }
+  ]
+}

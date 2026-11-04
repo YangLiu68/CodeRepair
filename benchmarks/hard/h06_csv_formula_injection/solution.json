@@ -1,0 +1,15 @@
+{
+  "summary": "Neutralise every formula trigger (=, +, -, @, tab, CR) in text columns only; numeric columns are written unchanged.",
+  "edits": [
+    {
+      "path": "billing/export.py",
+      "old": "FORMULA_TRIGGERS = (\"=\",)\n",
+      "new": "FORMULA_TRIGGERS = (\"=\", \"+\", \"-\", \"@\", \"\\t\", \"\\r\")\n"
+    },
+    {
+      "path": "billing/export.py",
+      "old": "            cells = [\n                invoice.number,\n                issued,\n                customer,\n                line.description,\n                str(line.quantity),\n                str(line.amount.rounded().amount),\n                invoice.currency,\n            ]\n            rows.append([neutralize(cell) for cell in cells])\n",
+      "new": "            rows.append(\n                [\n                    neutralize(invoice.number),\n                    issued,\n                    neutralize(customer),\n                    neutralize(line.description),\n                    str(line.quantity),\n                    str(line.amount.rounded().amount),\n                    invoice.currency,\n                ]\n            )\n"
+    }
+  ]
+}

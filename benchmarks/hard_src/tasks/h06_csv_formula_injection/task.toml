@@ -1,0 +1,9 @@
+category = "security-csv-injection"
+difficulty = "hard"
+issue_style = "external security report (CWE-1236); the obvious fix breaks numeric columns; no failing test"
+summary = "Neutralise every formula trigger (=, +, -, @, tab, CR) in text columns only; numeric columns are written unchanged."
+seeded_bug = "export neutralises only '=' and applies the text neutralisation to every column, numbers included"
+fail_to_pass = [
+    "tests/test_hidden_csv_injection.py::test_hidden_every_formula_trigger_is_neutralised_in_names",
+    "tests/test_hidden_csv_injection.py::test_hidden_descriptions_are_neutralised",
+]

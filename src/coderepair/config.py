@@ -45,6 +45,7 @@ class Settings:
     runs_dir: Path
     allowed_roots: tuple[Path, ...]
     public_tasks_dir: Path = PROJECT_ROOT / "benchmarks" / "public"
+    hard_tasks_dir: Path = PROJECT_ROOT / "benchmarks" / "hard"
     backend: str = "oracle"
     anthropic_model: str = "claude-opus-5-5"
     anthropic_effort: str = "high"
@@ -66,8 +67,9 @@ class Settings:
 
     @property
     def task_dirs(self) -> tuple[Path, ...]:
-        """Benchmark suites: first-party fixtures, then the public (QuixBugs) subset."""
-        return tuple(d for d in (self.tasks_dir, self.public_tasks_dir) if d.is_dir())
+        """Benchmark suites: first-party fixtures, the public (QuixBugs) subset, the hard tier."""
+        suites = (self.tasks_dir, self.public_tasks_dir, self.hard_tasks_dir)
+        return tuple(d for d in suites if d.is_dir())
 
     def sandbox_limits(self):
         from .sandbox.base import SandboxLimits
@@ -84,14 +86,16 @@ class Settings:
         public_dir = _env_path(
             "CODEREPAIR_PUBLIC_TASKS_DIR", PROJECT_ROOT / "benchmarks" / "public"
         )
+        hard_dir = _env_path("CODEREPAIR_HARD_TASKS_DIR", PROJECT_ROOT / "benchmarks" / "hard")
         roots_env = os.environ.get("CODEREPAIR_ALLOWED_ROOTS", "").strip()
         if roots_env:
             allowed = tuple(Path(p).expanduser() for p in roots_env.split(os.pathsep) if p)
         else:
-            allowed = (tasks_dir, public_dir)
+            allowed = (tasks_dir, public_dir, hard_dir)
         return cls(
             tasks_dir=tasks_dir,
             public_tasks_dir=public_dir,
+            hard_tasks_dir=hard_dir,
             runs_dir=_env_path("CODEREPAIR_RUNS_DIR", PROJECT_ROOT / "runs"),
             allowed_roots=allowed,
             backend=os.environ.get("CODEREPAIR_BACKEND", "oracle").strip() or "oracle",

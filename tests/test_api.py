@@ -28,8 +28,8 @@ def test_untrusted_host_header_is_rejected(client):
 
 def test_task_list_and_detail_expose_only_agent_visible_data(client):
     tasks = client.get("/api/tasks").json()
-    assert len(tasks) == 35
-    assert {t["id"][0] for t in tasks} == {"t", "q"}
+    assert len(tasks) == 44
+    assert {t["id"][0] for t in tasks} == {"t", "q", "h"}
     detail = client.get(f"/api/tasks/{TASK}")
     assert detail.status_code == 200
     body = detail.json()
@@ -44,6 +44,10 @@ def test_task_list_and_detail_expose_only_agent_visible_data(client):
     text = detail.text
     assert "test_hidden_" not in text
     assert "self._data.move_to_end(key)\\n        return value" not in text
+    hard = client.get("/api/tasks/h07_coupon_counts_invoices")
+    assert hard.status_code == 200
+    assert "test_hidden_" not in hard.text
+    assert "return last is None or period_index" not in hard.text  # a gold-only line
 
 
 def test_retrieval_endpoint(client):

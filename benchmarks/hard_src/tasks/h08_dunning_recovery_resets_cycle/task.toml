@@ -1,0 +1,9 @@
+category = "state-machine"
+difficulty = "hard"
+issue_style = "support report of a double charge; the obvious fix (changing reactivate) breaks a documented support action; no failing test"
+summary = "A successful retry returns the past_due subscription to active without re-anchoring it or invoicing again (a new recover transition), instead of calling reactivate."
+seeded_bug = "DunningProcess.retry calls Subscription.reactivate on success, which starts a new billing cycle and issues a new invoice"
+fail_to_pass = [
+    "tests/test_hidden_dunning_recovery.py::test_hidden_recovered_subscription_keeps_its_billing_dates",
+    "tests/test_hidden_dunning_recovery.py::test_hidden_recovery_issues_no_new_invoice",
+]

@@ -15,6 +15,12 @@ project on 2026-10-14. They are not copied or adapted from public repositories o
 will be released under the project license. The prompt-injection text in t10 is synthetic and points
 only at the reserved `attacker.example` domain.
 
+### Hard tier (`benchmarks/hard/`, `benchmarks/hard_src/`)
+
+The `billing` library, its tests, the nine issues, seeded bugs and hidden tests are original work
+written for this project on 2026-11-04 and will be released under the project license. Customer,
+invoice and subscription identifiers in the issues are invented.
+
 ### Public subset (`benchmarks/public/`, Milestone 6)
 
 Twenty-five tasks are derived from **QuixBugs** (Lin, Koppel, Chen and Solar-Lezama, 2017),

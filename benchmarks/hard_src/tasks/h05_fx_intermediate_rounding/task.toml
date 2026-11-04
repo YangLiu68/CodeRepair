@@ -1,0 +1,10 @@
+category = "numeric-precision"
+difficulty = "medium"
+issue_style = "storefront report with a misleading hypothesis (blames the rounding mode) and the failing test id"
+summary = "Cross conversions multiply by the exact cross rate and round once, instead of rounding an intermediate amount in the base currency."
+seeded_bug = "ExchangeRates.convert routes cross conversions through to_base, which rounds to the base currency's cents"
+fail_to_pass = [
+    "tests/test_fx.py::test_cross_conversion_rounds_only_once",
+    "tests/test_hidden_fx.py::test_hidden_cross_conversions_round_once",
+    "tests/test_hidden_fx.py::test_hidden_large_amounts_keep_their_precision",
+]

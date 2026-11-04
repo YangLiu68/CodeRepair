@@ -43,16 +43,17 @@ jobs:
         run: uv run coderepair sandbox selftest --sandbox docker
       - name: Unit, security, sandbox and acceptance tests (Docker backend)
         run: uv run pytest -rs
-      - name: Validate fixtures (host, trusted) and the public subset (sandboxed)
+      - name: Validate fixtures and the hard tier (host, trusted) and the public subset (sandboxed)
         run: |
-          uv run coderepair validate-fixtures --suite fixtures
+          uv run coderepair validate-fixtures --suite fixtures,hard
+          uv run coderepair validate-fixtures --suite hard --sandbox docker
           uv run coderepair validate-fixtures --suite public --sandbox docker
       - name: Retrieval metrics
         run: uv run coderepair eval-retrieval
       - name: Harness smoke (oracle mock backend, no secrets)
         run: |
-          uv run coderepair bench --backend oracle --sandbox docker \
-            --tasks t01_paginate_off_by_one t10_deep_merge_injection q06_gcd \
+          uv run coderepair bench --backend oracle --sandbox docker --suite all \
+            --tasks t01_paginate_off_by_one t10_deep_merge_injection q06_gcd h07_coupon_counts_invoices \
             --out "$RUNNER_TEMP/bench/oracle.jsonl"
           uv run coderepair repair t07_safe_join_prefix_escape --backend oracle \
             --sandbox docker --evaluate --no-save --no-color

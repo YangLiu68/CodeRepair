@@ -1,0 +1,10 @@
+category = "validation"
+difficulty = "medium"
+issue_style = "auditor's report with the failing test id; a stricter-than-documented fix breaks FX entries"
+summary = "Journal.post checks that the postings balance separately in every currency instead of netting all amounts together."
+seeded_bug = "Journal.post sums posting amounts across currencies, so a USD debit can offset a EUR credit"
+fail_to_pass = [
+    "tests/test_ledger.py::test_entry_must_balance_in_each_currency",
+    "tests/test_hidden_ledger.py::test_hidden_currencies_are_never_netted",
+    "tests/test_hidden_ledger.py::test_hidden_rejected_entries_leave_no_trace",
+]

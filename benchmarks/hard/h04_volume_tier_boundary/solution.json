@@ -1,0 +1,10 @@
+{
+  "summary": "A quantity exactly on a tier's inclusive up_to bound is priced in that tier.",
+  "edits": [
+    {
+      "path": "billing/pricing.py",
+      "old": "        if tier.up_to is None or quantity < tier.up_to:\n",
+      "new": "        if tier.up_to is None or quantity <= tier.up_to:\n"
+    }
+  ]
+}

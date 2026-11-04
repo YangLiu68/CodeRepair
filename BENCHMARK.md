@@ -1,6 +1,6 @@
 # Benchmark
 
-Two task suites, hidden-test scoring in the sandbox, and a comparative benchmark of three repair
+Three task suites, hidden-test scoring in the sandbox, and a comparative benchmark of three repair
 agents under equal budgets (Milestone 5). Every number below was produced by a command in this
 repository; the raw rows are in `docs/results/`.
 
@@ -101,7 +101,50 @@ currently excluded as too slow.
 | `q24_to_base` | failing test provided | 7 (1) | 3 |
 | `q25_wrap` | failing test provided | 5 (1) | 0 |
 
-### Layout and leakage controls (both suites)
+### Hard tier (`benchmarks/hard/`, 9 tasks, 2026-11-04)
+
+Built because current hosted models resolve all 35 tasks above on the first call (see the Claude
+results below). The nine tasks share one realistic repository, `billing`: a subscription-billing
+library of 22 modules (about 80k characters of source plus 95 tests, written for this project),
+with money and FX, tax, coupons, invoices, proration, subscriptions, dunning, a ledger and CSV
+export. Each task seeds one bug into it, the way SWE-bench tasks share a project. Sources are in
+`benchmarks/hard_src/` (the clean `base/` repository and per-task `bug.json`, issue and hidden
+tests); `coderepair build-hard-suite` builds the tasks, makes each gold solution the exact
+inverse of its seeded bug, computes pass-to-pass from a real run, and refuses a task whose failing
+tests differ from its declared fail-to-pass.
+
+What makes them harder, without hiding information: every rule a fix needs is written in the
+repository's own docstrings or README.
+
+- **Size.** The source alone is larger than the 60k-character context budget: the `direct` agent
+  never sees `subscriptions.py` and gets `pricing.py` truncated; `retrieval` sees three source files.
+- **Symptom far from cause.** Issues report what users saw (renewal dates, invoice totals, a double
+  charge), not the function.
+- **Misleading issues.** h04 blames usage periods and h05 blames the rounding mode.
+- **Regression traps.** For six tasks the obvious fix breaks a test. Each wrong fix below was
+  applied to the built task and run; only the `feedback` agent sees visible test failures.
+- **Hidden tests check the documented rule**, not just the reported example.
+
+| Task | Seeded bug | The issue | Tempting wrong fix → what catches it |
+|---|---|---|---|
+| `h01_cycle_anchor_drift` | next billing period stepped from the previous (clamped) end, so Jan 31 drifts to the 28th | renewal dates of month-end signups | — |
+| `h02_credit_allocation_sign` | `Money.allocate` truncates negative shares toward zero, so credits do not add up | a downgrade invoice, with its numbers | flooring negative shares: totals add up, but credits no longer mirror charges (2 hidden tests) |
+| `h03_vat_inclusive_discount` | inclusive VAT taken from the pre-discount price | VAT on discounted German invoices; failing test given | — |
+| `h04_volume_tier_boundary` | a quantity exactly on a tier bound priced in the next tier | low usage invoices; **blames usage periods** | counting usage on the period end: 2 visible usage tests fail |
+| `h05_fx_intermediate_rounding` | cross conversion rounds an intermediate USD amount | storefront prices off by one fils; **blames the rounding mode**; failing test given | banker's rounding: a visible money test fails |
+| `h06_csv_formula_injection` | only `=` neutralised, and every column, numbers included, goes through the text filter | external security report (CWE-1236) | extending the trigger list only: `-12.50` becomes `'-12.50` (visible export test) |
+| `h07_coupon_counts_invoices` | coupon duration counts invoices instead of billing periods | an upgrade cost a month of discount | not counting proration invoices: a visible coupon test and 3 hidden tests fail |
+| `h08_dunning_recovery_resets_cycle` | a successful payment retry calls `reactivate`, which starts a new cycle and invoices again | double charge after a card retry | making `reactivate` keep dates when past due: a visible support-restart test fails |
+| `h09_ledger_currency_netting` | journal nets amounts across currencies | auditor's report; failing test given | one currency per entry: the visible FX-clearing test fails |
+
+Context the agents get (Limits: 60k characters; `retrieval` gets a repository map plus three
+source and two test files): `retrieval`'s three source files include the file to fix for 6 of
+the 9 tasks (not h03 `invoice.py`, h04 `pricing.py`, h05 `fx.py`; its ranking keeps choosing
+`errors.py` and `money.py`); `direct` reads files in path order and reaches every file to fix
+except `subscriptions.py` (h07, h08) and the end of `pricing.py` (h04). Retrieval was not changed
+after this was measured, so the tier stays a held-out test of the current pipeline.
+
+### Layout and leakage controls (all suites)
 
 ```
 <suite>/<id>/
@@ -116,8 +159,9 @@ currently excluded as too slow.
 
 - The agent's ingestion root is `repo/`; nothing else is readable to it, and the sandbox cannot read
   the benchmark directories either (`host-files` probe).
-- Tests check every prompt, for every task in both suites, for gold-added lines and hidden-test
-  lines (`test_agent.py`, `test_public.py`). The repair loop only ever runs visible tests.
+- Tests check every prompt, for every task in every suite, for gold-added lines and hidden-test
+  lines (`test_agent.py`, `test_public.py`, `test_hard_suite.py`, which checks both the `direct` and
+  the retrieval prompt). The repair loop only ever runs visible tests.
 - Public tasks contain no QuixBugs name, upstream harness or corrected code in `repo/` or the issue.
 - **Contamination:** QuixBugs has been public since 2017 and is very likely in the training data of
   current models. Results on the public subset can reflect memorisation, which is why both suites are
@@ -131,8 +175,9 @@ For each task, on throwaway copies (public tasks always in the sandbox): visible
 fail on the buggy repo and all others pass; with hidden tests exactly the fail-to-pass tests fail and
 exactly the pass-to-pass tests pass; with the gold edits every test passes; at least one hidden test
 detects the bug; the gold edits satisfy the agent's patch policy; `solution.patch` and the manifest
-are current. Current result: **35/35 valid** with the Seatbelt sandbox and with the Docker sandbox
-(under Colima), 2026-10-15.
+are current. Current result: **44/44 valid** with the Seatbelt sandbox (2026-11-04); the 35 tasks
+of the first two suites were also 35/35 valid with the Docker sandbox under Colima (2026-10-15).
+The hard tier has not been run in Docker yet.
 
 **Fixture revision (2026-10-14):** the M1 smoke run produced `round(float(amount) * 100 + 0.5)` for
 t08, which is wrong (`"0.01"` → 2 cents) but passed every test. The hidden pass-to-pass test
@@ -175,7 +220,7 @@ the 30 fixture rows of the three original agents come from the first run (same c
 task hashes); its public rows were re-run on subset v2. `feedback-sampled` was added afterwards to
 the same files. Raw rows, summaries and per-task tables:
 `docs/results/m5v2_ollama_{qwen2.5-3b,qwen2.5-coder-3b}.{jsonl,summary.json,md}`. Reproduce with
-`CODEREPAIR_OLLAMA_MODEL=<model> uv run coderepair bench --suite all --backend ollama
+`CODEREPAIR_OLLAMA_MODEL=<model> uv run coderepair bench --suite fixtures,public --backend ollama
 --agents direct,retrieval,feedback,feedback-sampled --out <file>.jsonl`, then
 `uv run coderepair bench-report <files>`.
 
@@ -246,7 +291,7 @@ backend, 2026-11-04, same 35 tasks, budget and Seatbelt sandbox as the 3B runs, 
 reasoning, `data_collection: deny`. Three agents (`feedback-sampled` would send the same requests as
 `feedback`, because these models accept no `temperature`). Raw rows, summaries and per-task tables:
 `docs/results/m5v2_openrouter_{claude-haiku-5.5,claude-sonnet-5.5}.{jsonl,summary.json,md}`.
-Reproduce with `CODEREPAIR_OPENROUTER_MODEL=<model> uv run coderepair bench --suite all
+Reproduce with `CODEREPAIR_OPENROUTER_MODEL=<model> uv run coderepair bench --suite fixtures,public
 --backend openrouter --sandbox seatbelt --max-cost-usd <cap> --out <file>.jsonl` (needs
 `OPENROUTER_API_KEY`).
 
@@ -282,15 +327,71 @@ Reproduce with `CODEREPAIR_OPENROUTER_MODEL=<model> uv run coderepair bench --su
 - Accounting check: the key's usage rose by $0.8221 over the pilot, both runs and one probe call;
   the rows record $0.0544 + $0.7639, the pilot $0.0036 and the probe $0.0001.
 
+### Results (hard tier: Claude Haiku 5.5 and Sonnet 5.5 through OpenRouter)
+
+**Runs:** the 9 hard-tier tasks, same budget, Seatbelt sandbox, backend settings and agents as the
+Claude runs above, 2026-11-04. Raw rows, summaries and per-task tables:
+`docs/results/hard_openrouter_{claude-haiku-5.5,claude-sonnet-5.5}.{jsonl,summary.json,md}`.
+Reproduce with `--suite hard` in the command above.
+
+| Task | Haiku: direct / retrieval / feedback | Sonnet: direct / retrieval / feedback |
+|---|---|---|
+| h01 cycle anchor drift | ✓ ✓ ✓ | ✓ ✓ ✓ |
+| h02 credit allocation sign | ✓ ✓ ✓ | ✓ ✓ ✓ |
+| h03 VAT inclusive discount | ✓ · · | ✓ · · |
+| h04 volume tier boundary | ✓ · · | ✓ · · |
+| h05 FX intermediate rounding | ✓ · · | ✓ · · |
+| h06 CSV formula injection | ✓ ✓ ✓ | ✓ ✓ ✓ |
+| h07 coupon counts invoices | ✓ ✓ ✓ | ✓ ✓ ✓ |
+| h08 dunning recovery | · ✓ ✓ | · ✓ ✓ |
+| h09 ledger currency netting | ✓ ✓ ✓ | ✓ ✓ ✓ |
+| **Resolved** | **8 / 6 / 6** | **8 / 6 / 6** |
+
+✓ resolved, · no patch. Every resolved row was resolved by the first call; every unresolved row
+ended with the model returning no edits after three calls (`no-edits`); no row produced a wrong
+fix or a regression.
+
+| | Haiku 5.5 | Sonnet 5.5 |
+|---|---|---|
+| Cost recorded per row (provider-reported per response) | $0.071 | $1.326 |
+| Mean tokens per row (direct / retrieval / feedback) | 29.1k / 17.4k / 17.6k | 28.8k / 17.1k / 17.3k |
+
+Pooled over both models, one unit per task: direct − retrieval = +4 resolved runs (p = 0.625,
+exact sign-flip); retrieval and feedback are identical.
+
+**What this shows:**
+
+- **The tier separates the agents, and the separation is entirely about context.** Each of the
+  nine unresolved rows per model is a task whose file to fix was not in the prompt: `retrieval`
+  and `feedback` missed exactly the three tasks where retrieval's top three source files left out
+  the buggy file (h03 `invoice.py`, h04 `pricing.py`, h05 `fx.py`), and `direct` missed exactly
+  h08, whose fix needs `subscriptions.py`, beyond its 60k-character window. Both models then
+  declined to guess: they returned no edits rather than an edit to a file they could not see.
+- **Given the right file, both models fixed every bug on the first call**, including the
+  regression traps and the two misleading issues. So the traps never came into play, and test
+  feedback had nothing to correct: `feedback` equals `retrieval` row for row. Even the 3-of-9
+  gap between direct and retrieval is not significant on nine tasks (p = 0.625).
+- **On this repository, reading files in path order beat ranked retrieval** (8 against 6 per
+  model). Retrieval's ranking favours modules that match the issue's words and the failing
+  test's imports (`errors.py`, `money.py`, `currency.py`) over the module that holds the
+  computation. That is the weakest component this benchmark has found. Direct costs about
+  1.7 times the tokens per row and cannot scale past its window.
+- **Cost:** $0.071 (Haiku) and $1.326 (Sonnet) for the 54 rows, provider-reported per response.
+  The key's billed usage lagged by several minutes after the runs (it first showed $0.62 less),
+  then reached exactly the recorded total for all runs so far ($2.2187).
+
 **First run (2026-10-15, subset v1, 22 tasks, `qwen2.5:3b`, three agents):** direct 1/22,
 retrieval 3/22, feedback 3/22; valid patches 11/14/17. Its public rows were measured on the v1
 `conftest.py` with the timer bug (see Revisions) and are superseded by v2; the apparent rise in
 valid patches from direct to feedback did not replicate in v2. Raw rows:
 `docs/results/m5_ollama_qwen2.5-3b.{jsonl,summary.json,md}`.
 
-**Next:** 3B models are too weak and current hosted models too strong for these 35 tasks. Ranking
-the agents needs a harder task tier between the two (or a mid-size local model on this one); the
-harness, the ablation, the statistics and the spend cap run unchanged on any new suite.
+**Next:** on the 35 tasks, 3B models are too weak and hosted models too strong to rank the agents.
+The hard tier ranks them, but by context selection only: the next improvement is to let the agent
+choose what to read (iterate over the repository map, open files on request, follow the code from
+the symptom) rather than a fixed top three, and then tasks whose difficulty is in the reasoning
+once the right files are open. A retrieval change measured on this tier is no longer a held-out
+result, so it needs new tasks to confirm it.
 
 ## Milestone 1 smoke run (historical, patches not executed)
 

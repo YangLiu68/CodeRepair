@@ -1,5 +1,41 @@
 # Progress log
 
+## 2026-11-04 (later) — Hard tier: 9 tasks on a shared billing library
+
+### Implemented
+
+| Area | Change |
+|---|---|
+| Hard tier | `benchmarks/hard_src/base/`: `billing`, a 22-module subscription-billing library (money and FX, tax, coupons, invoices, proration, subscriptions, dunning, payments, ledger, CSV export; ~80k characters of source, 95 tests), written for this project. Nine tasks seed one bug each (`bug.json`), with an issue and hidden tests; six have a regression trap and two a misleading issue |
+| Builder | `coderepair build-hard-suite` (`benchmark/hard_suite.py`): base + seeded bug per task, gold = exact inverse, pass-to-pass computed from a real run, refuses tasks whose failing tests differ from the declared fail-to-pass; `check_built` detects stale built tasks |
+| Suites | `hard` registered everywhere (`TASK_ID_RE` accepts `h01_...`, settings, allowed roots, API/dashboard via `task_dirs`, CI); `--suite` takes `all` or a comma list (`fixtures,public`) so the earlier 35-task runs stay reproducible now that `all` includes the hard tier |
+| CI and README | the oracle smoke run silently dropped `q06_gcd` (default suite `fixtures`); now `--suite all`, plus a hard task. Same fix in the README example |
+
+### Problems found and fixed while building
+
+- `Subscription.start(usage=UsageLog())` silently replaced an empty usage log with a new one
+  (`usage or UsageLog()`, and `UsageLog` defines `__len__`), so usage recorded later was never
+  billed. Fixed in the base before any task was built (`is not None`).
+- A hidden test priced API calls with `Money.of("0.002", "USD")`, which rounds to $0.00; the
+  validator caught it (gold failed) before any model ran. Sub-cent unit prices are unrounded
+  `Money` values now.
+- Two of my probe patches for the trap check did not import; re-run correctly before claiming any
+  trap.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| Builder | 9/9 tasks built; failing tests equal the declared fail-to-pass for each |
+| `validate-fixtures --suite hard` | 9/9 valid on the host and in Seatbelt |
+| Regression traps | the tempting wrong fix applied and run for 7 tasks: each fails at least one visible or hidden test (h02 flooring: 2 hidden; h04 usage window: 2 visible + 3 hidden; h05 banker's rounding: 2 visible + 3 hidden; h06 trigger list only: 1 + 1; h07 skip proration: 1 + 3; h08 reactivate: 1 visible; h09 one currency: 1 + 1) |
+| Context check | retrieval's three source files miss the file to fix for h03, h04, h05; `direct` never reaches `subscriptions.py` (h07, h08) and truncates `pricing.py` |
+| New tests | `test_hard_suite.py` 37 passed |
+| Hard tier, Claude Haiku 5.5 / Sonnet 5.5 (real API) | both: direct 8/9, retrieval 6/9, feedback 6/9 on the same tasks; every failure `no-edits` with the file to fix missing from the prompt; no wrong fix, no regression |
+| Cost | $0.071 + $1.326 recorded; the key's billed usage lagged, then matched the recorded total for every run so far exactly ($2.2187) |
+| All suites | `validate-fixtures --suite all --sandbox seatbelt` 44/44; `--suite fixtures,hard` on the host 19/19; ruff and `uv lock --check` clean |
+| Hard tier in Docker | not run (Colima stopped); CI now includes it |
+
 ## 2026-11-04 — OpenRouter backend, cost accounting, spend cap
 
 ### Implemented
@@ -20,7 +56,7 @@
 
 ### Findings
 
-- The 35-task suite saturates for hosted models: no agent difference to test. Together with the
+- (Superseded by the hard tier above for ranking.) The 35-task suite saturates for hosted models: no agent difference to test. Together with the
   3B runs (too weak), this means ranking the agents needs a harder task tier, not more runs.
 - Claude models on OpenRouter accept no `temperature`/`seed`; their first call is a sample, so
   `feedback-sampled` is identical to `feedback` there and was not run.

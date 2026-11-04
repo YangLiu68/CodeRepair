@@ -1,0 +1,15 @@
+diff --git a/billing/periods.py b/billing/periods.py
+--- a/billing/periods.py
++++ b/billing/periods.py
+@@ -51,7 +51,10 @@
+ 
+     def next_period(self, current: Period) -> Period:
+         """The period after ``current``, which must be one of this cycle's periods."""
+-        return Period(current.end, add_months(current.end, self.interval_months))
++        index = self.index_of(current.start)
++        if self.period(index) != current:
++            raise InvalidPeriod(f"{current} is not a period of this cycle")
++        return self.period(index + 1)
+ 
+     def periods(self, start_index: int = 0) -> Iterator[Period]:
+         index = start_index

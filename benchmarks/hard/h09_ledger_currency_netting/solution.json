@@ -1,0 +1,10 @@
+{
+  "summary": "Journal.post checks that the postings balance separately in every currency instead of netting all amounts together.",
+  "edits": [
+    {
+      "path": "billing/ledger.py",
+      "old": "        net = sum(posting.amount.rounded().amount for posting in postings)\n        if net != 0:\n            raise UnbalancedEntry(f\"{memo}: does not balance ({net} off)\")\n",
+      "new": "        sums: dict[str, Money] = {}\n        for posting in postings:\n            currency = posting.amount.currency\n            sums[currency] = sums.get(currency, Money.zero(currency)) + posting.amount.rounded()\n        unbalanced = {c: s for c, s in sums.items() if not s.is_zero()}\n        if unbalanced:\n            detail = \", \".join(f\"{s} off\" for s in unbalanced.values())\n            raise UnbalancedEntry(f\"{memo}: does not balance ({detail})\")\n"
+    }
+  ]
+}

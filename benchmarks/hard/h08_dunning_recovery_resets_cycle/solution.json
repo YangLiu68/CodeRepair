@@ -1,0 +1,15 @@
+{
+  "summary": "A successful retry returns the past_due subscription to active without re-anchoring it or invoicing again (a new recover transition), instead of calling reactivate.",
+  "edits": [
+    {
+      "path": "billing/dunning.py",
+      "old": "            self.subscription.reactivate(day)\n",
+      "new": "            self.subscription.recover(day)\n"
+    },
+    {
+      "path": "billing/subscriptions.py",
+      "old": "    def mark_unpaid",
+      "new": "    def recover(self, on: date) -> None:\n        \"\"\"A late payment succeeded: back to active, same billing dates, no new invoice.\"\"\"\n        if self.status != \"past_due\":\n            raise InvalidTransition(f\"cannot recover a {self.status} subscription\")\n        self.status = \"active\"\n        self.events.publish(\"subscription.updated\", on, self.id, status=\"active\")\n\n    def mark_unpaid"
+    }
+  ]
+}

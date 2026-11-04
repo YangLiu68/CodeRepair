@@ -43,7 +43,7 @@ addopts = "-q -p no:cacheprovider"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["benchmarks/tasks", "benchmarks/public"]
+extend-exclude = ["benchmarks/tasks", "benchmarks/public", "benchmarks/hard", "benchmarks/hard_src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S"]

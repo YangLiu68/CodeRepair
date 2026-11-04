@@ -1,0 +1,10 @@
+category = "numeric-sign-handling"
+difficulty = "hard"
+issue_style = "finance report with numbers; symptom in proration invoices, root cause in Money.allocate; no failing test"
+summary = "Money.allocate splits the absolute amount and negates the parts, so negative amounts (credits) add up exactly and mirror the matching positive split."
+seeded_bug = "Money.allocate truncates negative shares toward zero and slices with a negative leftover, so negative splits do not add up"
+fail_to_pass = [
+    "tests/test_hidden_credits.py::test_hidden_negative_allocation_mirrors_the_positive_one",
+    "tests/test_hidden_credits.py::test_hidden_downgrade_credit_lines_add_up_to_the_unused_amount",
+    "tests/test_hidden_credits.py::test_hidden_split_of_a_negative_amount",
+]

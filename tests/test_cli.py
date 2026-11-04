@@ -10,7 +10,7 @@ from coderepair.cli import colorize_diff, main
 def test_tasks(capsys):
     assert main(["tasks"]) == 0
     out = capsys.readouterr().out
-    assert out.count("\n") == 35  # 10 first-party fixtures + 25 public tasks
+    assert out.count("\n") == 44  # 10 first-party fixtures, 25 public tasks, 9 hard tasks
     assert "t10_deep_merge_injection" in out and "q12_" in out
 
 

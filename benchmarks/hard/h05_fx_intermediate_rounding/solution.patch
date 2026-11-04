@@ -1,0 +1,14 @@
+diff --git a/billing/fx.py b/billing/fx.py
+--- a/billing/fx.py
++++ b/billing/fx.py
+@@ -81,9 +81,4 @@
+         """``money`` in ``target``, rounded once to the target's minor units."""
+         if money.currency == target:
+             return money.rounded()
+-        source = money.currency
+-        direct = (source, target) in self._pairs or (target, source) in self._pairs
+-        if direct or self.base in (source, target):
+-            return Money(money.amount * self.rate(source, target), target).rounded()
+-        # no direct rate: convert through the base currency
+-        return self.convert(self.to_base(money), target)
++        return Money(money.amount * self.rate(money.currency, target), target).rounded()

@@ -1,0 +1,21 @@
+diff --git a/billing/ledger.py b/billing/ledger.py
+--- a/billing/ledger.py
++++ b/billing/ledger.py
+@@ -50,9 +50,14 @@
+         postings = tuple(p for p in postings if not p.amount.rounded().is_zero())
+         if len(postings) < 2:
+             raise UnbalancedEntry(f"{memo}: an entry needs at least two non-zero postings")
+-        net = sum(posting.amount.rounded().amount for posting in postings)
+-        if net != 0:
+-            raise UnbalancedEntry(f"{memo}: does not balance ({net} off)")
++        sums: dict[str, Money] = {}
++        for posting in postings:
++            currency = posting.amount.currency
++            sums[currency] = sums.get(currency, Money.zero(currency)) + posting.amount.rounded()
++        unbalanced = {c: s for c, s in sums.items() if not s.is_zero()}
++        if unbalanced:
++            detail = ", ".join(f"{s} off" for s in unbalanced.values())
++            raise UnbalancedEntry(f"{memo}: does not balance ({detail})")
+         entry = Entry(on, memo, postings)
+         self.entries.append(entry)
+         return entry

@@ -1,0 +1,12 @@
+diff --git a/billing/pricing.py b/billing/pricing.py
+--- a/billing/pricing.py
++++ b/billing/pricing.py
+@@ -12,7 +12,7 @@
+ def tier_for(tiers: Sequence[Tier], quantity: int) -> Tier:
+     """The tier a total ``quantity`` falls in (``up_to`` is inclusive)."""
+     for tier in tiers:
+-        if tier.up_to is None or quantity < tier.up_to:
++        if tier.up_to is None or quantity <= tier.up_to:
+             return tier
+     raise PricingError("tier table has no open-ended last tier")  # pragma: no cover
+ 

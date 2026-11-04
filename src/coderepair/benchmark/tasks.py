@@ -22,8 +22,9 @@ from pathlib import Path
 
 from ..patch import PatchProposal
 
-# t01_... first-party fixtures, q01_... the public (QuixBugs-derived) suite
-TASK_ID_RE = re.compile(r"^[tq]\d{2}_[a-z0-9_]+$")
+# t01_... first-party fixtures, q01_... the public (QuixBugs-derived) suite,
+# h01_... the hard tier (first-party, built from benchmarks/hard_src)
+TASK_ID_RE = re.compile(r"^[tqh]\d{2}_[a-z0-9_]+$")
 
 
 class TaskError(ValueError):

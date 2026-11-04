@@ -1,0 +1,7 @@
+[
+  {
+    "path": "billing/periods.py",
+    "old": "        index = self.index_of(current.start)\n        if self.period(index) != current:\n            raise InvalidPeriod(f\"{current} is not a period of this cycle\")\n        return self.period(index + 1)\n",
+    "new": "        return Period(current.end, add_months(current.end, self.interval_months))\n"
+  }
+]

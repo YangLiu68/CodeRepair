@@ -175,7 +175,7 @@ If the files changed since the run, or the stored patch was edited after approva
 # harness check with the mock (seconds)
 uv run coderepair bench --backend oracle --tasks t01_paginate_off_by_one q06_gcd
 # real local model (the run recorded in BENCHMARK.md)
-CODEREPAIR_OLLAMA_MODEL=qwen2.5:3b uv run coderepair bench --suite all --backend ollama \
+CODEREPAIR_OLLAMA_MODEL=qwen2.5:3b uv run coderepair bench --suite fixtures,public --backend ollama \
     --out docs/results/m5_ollama_qwen2.5-3b.jsonl
 ```
 
