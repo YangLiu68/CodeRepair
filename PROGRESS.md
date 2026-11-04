@@ -15,6 +15,15 @@
 |---|---|
 | New offline tests | `test_openrouter_backend.py` 18 passed; bench cost/cap/fingerprint tests passed |
 | Live pilot (real API, 2026-11-04) | `anthropic/claude-haiku-5.5`, `t01_paginate_off_by_one` + `q03_find_first_in_sorted` x direct/retrieval/feedback, Seatbelt: 6/6 resolved on the first call, $0.0036 total. A pilot, not a benchmark result |
+| Full v2 benchmark, Claude through OpenRouter (2026-11-04) | 35 tasks x direct/retrieval/feedback, Seatbelt. Haiku 5.5: 35/34/35, $0.054; Sonnet 5.5: 35/35/35 (all on the first call), $0.764. Spend caps $1 and $3, not reached. The key's usage rose by exactly the recorded total ($0.8221 with pilot and probe) |
+| Full pytest after the change | exit 0 on Seatbelt (556 collected; Docker variants skipped, Colima stopped) |
+
+### Findings
+
+- The 35-task suite saturates for hosted models: no agent difference to test. Together with the
+  3B runs (too weak), this means ranking the agents needs a harder task tier, not more runs.
+- Claude models on OpenRouter accept no `temperature`/`seed`; their first call is a sample, so
+  `feedback-sampled` is identical to `feedback` there and was not run.
 
 ## 2026-10-15 (evening) — Third review, public subset v2, statistics, Docker for real, M5 v2
 

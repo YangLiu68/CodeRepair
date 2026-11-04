@@ -48,7 +48,7 @@ issue + repo ─► retrieval with reasons ─► model ─► validated edits �
 | M2 disposable, network-less test sandbox with abuse probes | done (Seatbelt on macOS; Docker run for real under Colima: probes 15/15, 35/35 tasks valid) |
 | M3 iterative repair loop | done |
 | M4 candidates, reproduction tests, lint/type/security checks, human approval | done |
-| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done, two local 3B models plus an ablation (see below) |
+| M5 comparative benchmark (direct vs retrieval vs test-feedback) | done: two local 3B models plus an ablation, and two Claude models through OpenRouter (see below) |
 | M6 licensed public subset (QuixBugs) with leakage controls | done |
 | M7 dashboard, CI, threat model, docs, demo | done (GitHub Actions has not run: no remote; its steps pass in a local Linux VM on Python 3.11–3.13) |
 
@@ -93,17 +93,27 @@ Configuration is environment-only; see [.env.example](.env.example).
 
 ## Measured
 
-Comparative benchmark (M5), 35 tasks, two local 3B models through Ollama, at most 3 model calls per
-agent per task, hidden tests scored in the sandbox. Resolved tasks with 95% Wilson intervals:
+Comparative benchmark (M5), 35 tasks, at most 3 model calls per agent per task, hidden tests scored
+in the sandbox. Two local 3B models through Ollama and two Claude models through OpenRouter.
+Resolved tasks with 95% Wilson intervals:
 
-| Agent | `qwen2.5:3b` | `qwen2.5-coder:3b` |
-|---|---|---|
-| direct (no retrieval, no tests) | 4/35 (5–26%) | 3/35 (3–22%) |
-| retrieval (ranked context, no tests) | 4/35 (5–26%) | 7/35 (10–36%) |
-| feedback (retrieval + sandboxed test loop) | 2/35 (2–19%) | 5/35 (6–29%) |
-| feedback-sampled (ablation: the loop's retries sampled) | 5/35 (6–29%) | 5/35 (6–29%) |
+| Agent | `qwen2.5:3b` | `qwen2.5-coder:3b` | Claude Haiku 5.5 | Claude Sonnet 5.5 |
+|---|---|---|---|---|
+| direct (no retrieval, no tests) | 4/35 (5–26%) | 3/35 (3–22%) | 35/35 (90–100%) | 35/35 (90–100%) |
+| retrieval (ranked context, no tests) | 4/35 (5–26%) | 7/35 (10–36%) | 34/35 (85–99%) | 35/35 (90–100%) |
+| feedback (retrieval + sandboxed test loop) | 2/35 (2–19%) | 5/35 (6–29%) | 35/35 (90–100%) | 35/35 (90–100%) |
+| feedback-sampled (ablation: the loop's retries sampled) | 5/35 (6–29%) | 5/35 (6–29%) | not run¹ | not run¹ |
 
-These models are too weak to rank the agents: no pairwise difference is significant (smallest
+¹ Claude models on OpenRouter accept no `temperature`, so `feedback-sampled` would send exactly the
+requests `feedback` sends.
+
+Neither end of the range ranks the agents. The Claude runs saturate: Sonnet resolved all 105
+(task, agent) pairs on its first call and Haiku 104 of 105, so this task set is **too easy for
+current hosted models to separate the designs**. The first-party fixtures saturate as well as the
+public QuixBugs tasks, so this is not only memorisation. Provider-reported cost for the 105 rows:
+$0.054 (Haiku) and $0.76 (Sonnet), which matches the change in the key's usage.
+
+The 3B models are too weak to rank the agents: no pairwise difference is significant (smallest
 p = 0.125, exact paired test by task over both models), so this does **not** show that test
 feedback resolves more issues. What the run does show: at temperature 0 the test-feedback loop
 never turned a failed first attempt into a fix (0 of 63), and the gap between retrieval and feedback

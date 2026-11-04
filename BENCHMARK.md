@@ -153,7 +153,9 @@ calls**, 60k tokens, 900 s):
 | `feedback` | retrieval context + M3 loop: sandboxed visible tests after each valid patch, failures fed back | visible tests only | top-ranked candidate (M4 scorecard) after up to 3 attempts |
 | `feedback-sampled` (ablation, `--agents` only) | as `feedback`, but retries 2 and 3 sample like the sampling agents (temperature 0.7, seeds 1 and 2) | visible tests only | as `feedback` |
 
-Sample 0 is deterministic (temperature 0); further samples use temperature 0.7 with seeds 1 and 2.
+Sample 0 is deterministic (temperature 0); further samples use temperature 0.7 with seeds 1 and 2,
+for backends whose model accepts these parameters (Claude models on OpenRouter accept neither, so
+every call there samples at the provider's default; see the Claude results).
 The `feedback` loop's retries stay at temperature 0 (the prompt changes, the sampling does not), so
 `feedback` versus `retrieval` changes two things at once; `feedback-sampled` changes only one.
 The submitted patch is scored with the hidden tests in the sandbox: **resolved** means every
@@ -237,15 +239,58 @@ Where the resolutions came from. The first call is the same deterministic reques
   feedback; in v2 it did not (its conftest changed with the subset, and temperature-0 Ollama calls
   are not guaranteed to repeat exactly).
 
+### Results (v2: Claude Haiku 5.5 and Sonnet 5.5 through OpenRouter)
+
+**Runs:** `anthropic/claude-haiku-5.5` and `anthropic/claude-sonnet-5.5` through the `openrouter`
+backend, 2026-11-04, same 35 tasks, budget and Seatbelt sandbox as the 3B runs, provider-default
+reasoning, `data_collection: deny`. Three agents (`feedback-sampled` would send the same requests as
+`feedback`, because these models accept no `temperature`). Raw rows, summaries and per-task tables:
+`docs/results/m5v2_openrouter_{claude-haiku-5.5,claude-sonnet-5.5}.{jsonl,summary.json,md}`.
+Reproduce with `CODEREPAIR_OPENROUTER_MODEL=<model> uv run coderepair bench --suite all
+--backend openrouter --sandbox seatbelt --max-cost-usd <cap> --out <file>.jsonl` (needs
+`OPENROUTER_API_KEY`).
+
+| Agent | Haiku 5.5 resolved | 95% CI | pass@1 | Sonnet 5.5 resolved | 95% CI | pass@1 |
+|---|---|---|---|---|---|---|
+| direct | **35/35** | 90–100% | 35/35 | **35/35** | 90–100% | 35/35 |
+| retrieval | **34/35** | 85–99% | 33/35 | **35/35** | 90–100% | 35/35 |
+| feedback | **35/35** | 90–100% | 35/35 | **35/35** | 90–100% | 35/35 |
+
+| | Haiku 5.5 | Sonnet 5.5 |
+|---|---|---|
+| Cost (105 rows, provider-reported) | $0.054 | $0.764 |
+| Most expensive row | $0.0023 | $0.0149 |
+| Mean tokens per row (direct / retrieval / feedback) | 2792 / 3020 / 2830 | 2490 / 2584 / 2589 |
+| Median wall time per row (direct / retrieval / feedback) | 3.8 / 3.9 / 6.3 s | 3.4 / 3.5 / 5.9 s |
+| Rows that needed more than one call | 1 | 0 |
+
+**What this shows:**
+
+- **The benchmark saturates.** Sonnet resolved all 105 (task, agent) pairs with its first call;
+  Haiku resolved 104. No paired difference exists to test (Haiku: retrieval lost `q03` once, p = 1.0).
+  At this level the 35 tasks cannot rank the agents in either direction; ranking them needs harder
+  tasks (larger repositories, misleading issues, bugs whose fix spans files), not more runs.
+- It is not only memorisation of QuixBugs: the ten first-party fixtures, written for this project,
+  saturate too (30/30 per model).
+- Haiku's two imperfect rows were both `retrieval`: `q03` was a wrong fix on the only call, and `q12`
+  needed a second sample after an invalid first patch. `feedback` sends the same first request and
+  resolved both on the first call. Without temperature control the first call is a sample, so the
+  `pass@1` agreement between `retrieval` and `feedback` that held at temperature 0 (3B runs) is not
+  expected here, and one disagreement is noise, not a finding.
+- With a model that gets it right the first time, the agents differ only in cost: tokens are
+  within 10% of each other, and `feedback` adds about 2.5 s per row for its visible-test run.
+- Accounting check: the key's usage rose by $0.8221 over the pilot, both runs and one probe call;
+  the rows record $0.0544 + $0.7639, the pilot $0.0036 and the probe $0.0001.
+
 **First run (2026-10-15, subset v1, 22 tasks, `qwen2.5:3b`, three agents):** direct 1/22,
 retrieval 3/22, feedback 3/22; valid patches 11/14/17. Its public rows were measured on the v1
 `conftest.py` with the timer bug (see Revisions) and are superseded by v2; the apparent rise in
 valid patches from direct to feedback did not replicate in v2. Raw rows:
 `docs/results/m5_ollama_qwen2.5-3b.{jsonl,summary.json,md}`.
 
-**Next:** a stronger model (`--backend anthropic`; no API key was available here) and several seeds
-per configuration are needed before any agent can be ranked. The harness, the ablation and the
-statistics run unchanged.
+**Next:** 3B models are too weak and current hosted models too strong for these 35 tasks. Ranking
+the agents needs a harder task tier between the two (or a mid-size local model on this one); the
+harness, the ablation, the statistics and the spend cap run unchanged on any new suite.
 
 ## Milestone 1 smoke run (historical, patches not executed)
 
@@ -261,15 +306,23 @@ These anchor errors motivated the loop's anchor hints.
   interrupted run with the same configuration; `<name>.summary.json` and `<name>.md` are written
   next to it. The agent list is not part of the configuration, so adding an agent (as was done for
   `feedback-sampled`) runs only the new rows. `coderepair bench-report` recomputes intervals and
-  paired tests from the JSONL files and ignores rows whose task content has since changed. Every row records backend, model, calls, tokens, latency and the failure category.
+  paired tests from the JSONL files and ignores rows whose task content has since changed. Every row
+  records backend, model, calls, tokens, latency, the failure category and, for hosted backends,
+  the provider-reported cost (`cost_usd`, including billed calls that failed). `--max-cost-usd`
+  starts no new row once a run's cost reaches the cap; re-running resumes. Backend settings that
+  change answers (OpenRouter: reasoning effort, data-collection policy, max tokens) are part of the
+  configuration fingerprint.
 - Repair runs write prompts, responses, feedback, attempts, candidates and traces to `runs/<id>/`.
 
 ## Limitations
 
 - Small: 35 tasks, single-file or few-file Python repositories, one bug each. Useful for comparing
   agent designs and failure modes, not for claims about general repair ability.
-- Two local 3B models, one run per configuration. The 95% intervals are 20–30 percentage points
-  wide and no agent difference is significant; temperature-0 calls are not guaranteed to repeat
-  exactly.
+- One run per configuration. With the two local 3B models the 95% intervals are 20–30 percentage
+  points wide and no agent difference is significant; temperature-0 calls are not guaranteed to
+  repeat exactly. With the two Claude models every agent is at or near 35/35, so there is nothing
+  to compare.
+- The hosted runs depend on OpenRouter's routing: a call may be served by different providers of
+  the same model (each response names its provider, but benchmark rows do not keep it).
 - The public subset is likely memorised by large models (see Contamination).
 - Retrieval metrics are near ceiling on the fixtures because candidate sets are small.

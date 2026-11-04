@@ -1,0 +1,162 @@
+{
+  "meta": {
+    "kind": "comparative benchmark",
+    "backend": "openrouter",
+    "model": "anthropic/claude-haiku-5.5",
+    "is_mock": false,
+    "budget": {
+      "max_calls": 3,
+      "max_tokens": 60000,
+      "max_wall_s": 900.0
+    },
+    "agents": [
+      "direct",
+      "retrieval",
+      "feedback"
+    ],
+    "sandbox": "seatbelt",
+    "sandbox_limits": {
+      "wall_timeout_s": 60.0,
+      "cpu_seconds": 60,
+      "memory_mb": 512,
+      "tmp_mb": 64,
+      "disk_write_mb": 256,
+      "max_file_mb": 32,
+      "max_open_files": 256,
+      "max_processes": 64,
+      "output_bytes": 65536,
+      "output_hard_cap_bytes": 8000000
+    },
+    "date": "2026-11-04T01:45:29+00:00",
+    "machine": "Darwin arm64 / Python 3.12.10",
+    "backend_config": {
+      "reasoning_effort": "provider-default",
+      "data_collection": "deny",
+      "max_tokens": 16000
+    },
+    "complete": true,
+    "spent_usd_this_run": 0.0544,
+    "max_cost_usd": 1.0
+  },
+  "config": "4fb923f68ac7",
+  "summary": {
+    "direct": {
+      "tasks": 35,
+      "resolved": 35,
+      "resolve_rate": 1.0,
+      "resolve_ci95": [
+        0.901,
+        1.0
+      ],
+      "pass_at_1": 35,
+      "valid_patch": 35,
+      "regressions": 0,
+      "mean_calls": 1,
+      "mean_tokens": 2792,
+      "median_llm_latency_s": 2.9,
+      "median_wall_s": 3.8,
+      "failures": {},
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 10
+        },
+        "public": {
+          "tasks": 25,
+          "resolved": 25
+        }
+      },
+      "cost_usd": 0.0176
+    },
+    "retrieval": {
+      "tasks": 35,
+      "resolved": 34,
+      "resolve_rate": 0.971,
+      "resolve_ci95": [
+        0.855,
+        0.995
+      ],
+      "pass_at_1": 33,
+      "valid_patch": 35,
+      "regressions": 0,
+      "mean_calls": 1.03,
+      "mean_tokens": 3020,
+      "median_llm_latency_s": 2.9,
+      "median_wall_s": 3.9,
+      "failures": {
+        "wrong-fix": 1
+      },
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 10
+        },
+        "public": {
+          "tasks": 25,
+          "resolved": 24
+        }
+      },
+      "cost_usd": 0.0196
+    },
+    "feedback": {
+      "tasks": 35,
+      "resolved": 35,
+      "resolve_rate": 1.0,
+      "resolve_ci95": [
+        0.901,
+        1.0
+      ],
+      "pass_at_1": 35,
+      "valid_patch": 35,
+      "regressions": 0,
+      "mean_calls": 1,
+      "mean_tokens": 2830,
+      "median_llm_latency_s": 2.6,
+      "median_wall_s": 6.3,
+      "failures": {},
+      "by_suite": {
+        "fixtures": {
+          "tasks": 10,
+          "resolved": 10
+        },
+        "public": {
+          "tasks": 25,
+          "resolved": 25
+        }
+      },
+      "cost_usd": 0.0172
+    }
+  },
+  "paired": [
+    {
+      "a": "direct",
+      "b": "retrieval",
+      "tasks": 35,
+      "both": 34,
+      "only_a": 1,
+      "only_b": 0,
+      "neither": 0,
+      "p_value": 1.0
+    },
+    {
+      "a": "direct",
+      "b": "feedback",
+      "tasks": 35,
+      "both": 35,
+      "only_a": 0,
+      "only_b": 0,
+      "neither": 0,
+      "p_value": 1.0
+    },
+    {
+      "a": "retrieval",
+      "b": "feedback",
+      "tasks": 35,
+      "both": 34,
+      "only_a": 0,
+      "only_b": 1,
+      "neither": 0,
+      "p_value": 1.0
+    }
+  ]
+}
